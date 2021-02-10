@@ -1,1 +1,1 @@
-# symphony-datafeed-fanout-common
+# fanout-common
