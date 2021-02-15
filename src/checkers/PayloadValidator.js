@@ -39,7 +39,8 @@ const allowedMaestroEvents = [
     'SWITCH_SCREENSHARING',
     'ENABLED_EMAIL_INTEGRATION',
     'DISABLED_EMAIL_INTEGRATION',
-    'MALWARE_SCAN_STATE_UPDATE'
+    'MALWARE_SCAN_STATE_UPDATE',
+    'STREAM_INVITATION'
 ];
 
 function shouldIgnoreMaestroEvent(message, maestroEvent) {

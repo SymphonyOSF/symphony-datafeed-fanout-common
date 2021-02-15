@@ -5,7 +5,7 @@
   },
   "name": "fanout-common",
   "description": "Common code between the ecs-fanout and the lambda-fanout",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "author": "Symphony",
   "license": "UNLICENSED",
   "main": "dist/index.js",
