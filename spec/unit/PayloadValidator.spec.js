@@ -24,4 +24,10 @@ describe('Payload Validator test', () => {
         const resp = validatePayloadType({ payload: { payload: { pending: true } } }, maestro);
         expect(resp.success).to.be.false;
     });
+    it('should accept stream invitation', () => {
+        const maestro = 'com.symphony.s2.model.chat.MaestroMessage.STREAM_INVITATION';
+        const resp = validatePayloadType({ payload: { payload: { pending: true } } }, maestro);
+        expect(resp.success).to.be.true;
+    });
+
 });
