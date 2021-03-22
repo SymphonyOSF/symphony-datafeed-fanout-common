@@ -58,7 +58,9 @@ export default function validatePayloadType(data, payloadType) {
         const payloadTypeSize = payloadType.length;
         const maestroEvent = payloadType.substring(payloadTypeSize, maestroEventPrefixLength);
         if (shouldIgnoreMaestroEvent(data, maestroEvent) || !allowedMaestroEvents.includes(maestroEvent)) {
-            message = `Invalid message: Event not allowed or should be ignored - Maestro-${maestroEvent}`;
+            const type = get(maestroEvent, 'payload.payload._type', 'N/A');
+            const messageId = get(maestroEvent, 'payload.payload.messageId', 'N/A');
+            message = `Invalid message: Event not allowed or should be ignored - Maestro- type=${type} messageId=${messageId}`;
             success = false;
         }
     }
