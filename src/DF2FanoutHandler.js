@@ -114,13 +114,13 @@ class DF2FanoutHandler {
 
         const payloadType = _get(message, 'data.payload.payloadType');
         if (_isUndefined(payloadType)) {
-            this.logger.error('id[%s] - STEP::Content validation - missing payloadType. Message = %o', message.id, message);
+            this.logger.info('id[%s] - STEP::Content validation - missing payloadType. Message = %o', message.id, message);
             throw new PipelineError({ message: `id[${message.id}] -  STEP::Content validation - Missing payloadType`, discardOriginalMessage: true });
         }
 
         const podId = _get(message, 'data.payload.podId');
         if (_isUndefined(podId)) {
-            this.logger.error('id[%s] - STEP::Content validation - missing podId. Message = %o', message.id, message);
+            this.logger.info('id[%s] - STEP::Content validation - missing podId. Message = %o', message.id, message);
             throw new PipelineError({ message: `id[${message.id}] -  STEP::Content validation - Missing podId`, discardOriginalMessage: true });
         }
 
@@ -131,7 +131,7 @@ class DF2FanoutHandler {
         if (!isReInsertedMessage) {
             const validationResult = validatePayloadType(message.data.payload, payloadType);
             if (!validationResult.success) {
-                this.logger.warn('id[%s] - STEP::Content validation - Not allowed message[%s]: %o', message.id, validationResult.message, message.data);
+                this.logger.info('id[%s] - STEP::Content validation - Not allowed message[%s]: %o', message.id, validationResult.message, message.data);
                 return false;
             }
         }
@@ -225,7 +225,7 @@ class DF2FanoutHandler {
                         }
                         this.logger.debug('id[%s] Finish replication for key[%s] - result %o', message.id, keyPrefix, results);
                     } else {
-                        this.logger.warn('id[%s] Cannot cache VLM: Empty payload', message.id);
+                        this.logger.info('id[%s] Cannot cache VLM: Empty payload', message.id);
                     }
                 } else {
                     this.logger.debug('id[%s] Cannot cache VLM: Redis not available', message.id);
@@ -313,7 +313,7 @@ class DF2FanoutHandler {
         try {
             const isBroadcast = _get(message, 'data.payload.broadcast') === 'ALL';
             if (isBroadcast) {
-                this.logger.warn('type[audit] broadcast messageId[%s]', _get(message.data, 'data.payload.payload.messageId'));
+                this.logger.info('type[audit] broadcast messageId[%s]', _get(message.data, 'data.payload.payload.messageId'));
                 await this.busService.broadcastMessage(message.data, podId);
             }
             return isBroadcast;
@@ -435,7 +435,7 @@ class DF2FanoutHandler {
             metrics.calculateInternalLatencyForValidate(Date.now() - validateD0);
 
             if (this.isNeitherTypingOrPresence(payloadType)) {
-                this.logger.warn('type[audit] received messageId[%s] from MF', _get(message, 'data.payload.payload.messageId'));
+                this.logger.info('type[audit] received messageId[%s] from MF', _get(message, 'data.payload.payload.messageId'));
             }
 
             telemetry.setPodId(podId);
@@ -516,7 +516,7 @@ class DF2FanoutHandler {
                                 }
                             });
                             if (this.isNeitherTypingOrPresence(payloadType)) {
-                                this.logger.warn('type[audit] fanout done for messageId[%s]', _get(message, 'data.payload.payload.messageId'));
+                                this.logger.info('type[audit] fanout done for messageId[%s]', _get(message, 'data.payload.payload.messageId'));
                             }
                             const d2Fanout = Date.now();
                             metrics.calculateInternalLatencyForFanout(d2Fanout - d1Fanout);
