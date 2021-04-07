@@ -5,7 +5,7 @@
   },
   "name": "fanout-common",
   "description": "Common code between the ecs-fanout and the lambda-fanout",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "author": "Symphony",
   "license": "UNLICENSED",
   "main": "dist/index.js",
@@ -30,8 +30,8 @@
     "symphony-datafeed-core": "3.2.7"
   },
   "devDependencies": {
-    "@babel/core": "7.12.13",
     "@babel/cli": "7.12.13",
+    "@babel/core": "7.12.13",
     "@babel/preset-env": "7.12.13",
     "@babel/register": "7.12.13",
     "babel-eslint": "10.1.0",
@@ -41,12 +41,12 @@
     "chai-as-promised": "7.1.1",
     "eslint": "7.19.0",
     "eslint-config-airbnb-base": "14.2.1",
+    "husky": "5.0.9",
     "mocha": "8.2.1",
     "mochawesome": "6.1.1",
     "nyc": "15.1.0",
     "sinon": "9.2.4",
-    "sinon-chai": "3.5.0",
-    "husky": "5.0.9"
+    "sinon-chai": "3.5.0"
   },
   "nyc": {
     "all": false,
