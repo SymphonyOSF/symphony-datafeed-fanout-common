@@ -1,53 +1,35 @@
-/* eslint-disable no-undef */
-/* eslint-disable no-unused-vars */
 /* eslint-disable no-unused-expressions */
-/* eslint-disable no-magic-numbers */
+/* eslint-disable no-undef */
 import { describe } from 'mocha';
-import chai from 'chai';
+import { expect } from 'chai';
 import sinon from 'sinon';
-import sinonChai from 'sinon-chai';
-import chaiAsPromised from 'chai-as-promised';
 
 import ObjectStorageService from '../../src/ObjectStorageService';
 
-chai.use(sinonChai);
-chai.use(chaiAsPromised);
-
-const expect = chai.expect;
-
 describe('ObjectStorageService Tests', () => {
-
-    const s3 = sinon.stub();
-    const s3GetObject = sinon.stub();
-    const data = {};
-
-    let objectStorageService;
-
-    beforeEach(() => {
-        ObjectStorageService.__Rewire__('s3GetObject', s3GetObject);
-        objectStorageService = new ObjectStorageService(s3);
-    });
-
     afterEach(() => {
-        s3GetObject.reset();
+        sinon.reset();
+        sinon.restore();
+        __rewire_reset_all__();
     });
 
     describe('Get payload from s3 feeds', () => {
-
         it('Should get payload with success', async () => {
-            s3GetObject.resolves(true);
-            const result = await objectStorageService.getPayload(data);
+            ObjectStorageService.__Rewire__('s3GetObject', sinon.fake.resolves(true));
+            const objectStorageService = new ObjectStorageService(null);
+            const result = await objectStorageService.getPayload({});
             expect(result).to.be.true;
         });
-
         it('Should not get payload from s3', async () => {
-            s3GetObject.rejects({ message: 'error' });
+            ObjectStorageService.__Rewire__('s3GetObject', sinon.fake.rejects(new Error('42')));
+            const objectStorageService = new ObjectStorageService(null);
+            let result;
             try {
-                await objectStorageService.getPayload(data);
-            } catch (e) {
-                expect(e.message).to.eq('error');
+                result = await objectStorageService.getPayload({});
+            } catch (error) {
+                expect(error.message).to.equals('42');
             }
+            expect(result).to.be.undefined;
         });
     });
-
 });

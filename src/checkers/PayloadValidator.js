@@ -1,4 +1,4 @@
-import get from 'lodash/get';
+import _ from 'lodash';
 
 const maestroEventPrefix = 'com.symphony.s2.model.chat.MaestroMessage.';
 const maestroEventPrefixLength = maestroEventPrefix.length;
@@ -45,7 +45,7 @@ const allowedMaestroEvents = [
 
 function shouldIgnoreMaestroEvent(message, maestroEvent) {
     if (maestroEvent === C_JOIN_ROOM_MAESTRO_EVENT) {
-        return get(message, 'payload.payload.pending', false);
+        return _.get(message, 'payload.payload.pending', false);
     }
     return false;
 }

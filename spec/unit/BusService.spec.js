@@ -1,241 +1,222 @@
-/* eslint-disable no-undef */
-/* eslint-disable no-unused-vars */
 /* eslint-disable no-unused-expressions */
-/* eslint-disable no-magic-numbers */
+/* eslint-disable no-undef */
 import { describe } from 'mocha';
-import chai, { expect } from 'chai';
+import { expect } from 'chai';
 import sinon from 'sinon';
-import sinonChai from 'sinon-chai';
-import chaiAsPromised from 'chai-as-promised';
 
 import BusService from '../../src/BusService';
 
-chai.use(sinonChai);
-chai.use(chaiAsPromised);
-
 describe('BusService Tests', () => {
-
-    const sqsClient = sinon.stub();
-    const snsClient = sinon.stub();
-    const sqsSendMessageBatch = sinon.stub();
-    const broadcast = sinon.stub();
-    const fanout = sinon.stub();
-    const sqsQueueCoordsFromName = sinon.stub();
-    const sqsSendMessage = sinon.stub();
     const message = { data: 'test' };
     const messageLength = JSON.stringify(message).length;
     const feeds = [];
     const podId = 123;
     const options = {};
 
-    let busService;
-
-    beforeEach(() => {
-        BusService.__Rewire__('sqsSendMessageBatch', sqsSendMessageBatch);
-        BusService.__Rewire__('broadcast', broadcast);
-        BusService.__Rewire__('fanout', fanout);
-        BusService.__Rewire__('sqsQueueCoordsFromName', sqsQueueCoordsFromName);
-        BusService.__Rewire__('sqsSendMessage', sqsSendMessage);
-
-        busService = new BusService({ sqsClient, snsClient, options });
-    });
-
     afterEach(() => {
-        sqsSendMessageBatch.reset();
-        broadcast.reset();
-        fanout.reset();
-        sqsQueueCoordsFromName.reset();
-        sqsSendMessage.reset();
+        sinon.reset();
+        sinon.restore();
+        __rewire_reset_all__();
     });
 
     describe('Get ingestion queue context', () => {
-
-        it('Should get the context with success', async () => {
-            sqsQueueCoordsFromName.returns({ context: 'test-context' });
-            const result = await busService.getIngestionQueueContext();
-            expect(result.context).to.eq('test-context');
+        it('Should get the context with success', () => {
+            BusService.__Rewire__('sqsQueueCoordsFromName', sinon.fake.returns({ url: 'test://test' }));
+            const busService = new BusService({ sqsClient: null, snsClient: null, options });
+            const result = busService.getIngestionQueueContext();
+            expect(result.url).to.eqls('test://test');
         });
-
-        it('Should not get the context', async () => {
-            sqsQueueCoordsFromName.returns(new Error('error'));
+        it('Should not get the context', () => {
+            BusService.__Rewire__('sqsQueueCoordsFromName', sinon.fake.throws(new Error('42')));
+            const busService = new BusService({ sqsClient: null, snsClient: null, options });
+            let result;
             try {
-                await busService.getIngestionQueueContext();
-            } catch (e) {
-                expect(e.message).to.eq('error');
+                result = busService.getIngestionQueueContext();
+            } catch (error) {
+                expect(error.message).to.equals('42');
             }
+            expect(result).to.be.undefined;
         });
-    });
-
-    describe('Get ingestion queue context', () => {
-
-        it('Should get the context with success', async () => {
-            sqsQueueCoordsFromName.returns({ context: 'test-context' });
-            const result = await busService.getIngestionQueueContext();
-            expect(result.context).to.eq('test-context');
-        });
-
-        it('Should get the context with success', async () => {
-            busService.ingestionQueueContext = { context: 'new-context' };
-            const result = await busService.getIngestionQueueContext();
-            expect(result.context).to.eq('new-context');
-        });
-
-        it('Should not get the context', async () => {
-            sqsQueueCoordsFromName.returns(new Error('error'));
-            try {
-                await busService.getIngestionQueueContext();
-            } catch (e) {
-                expect(e.message).to.eq('error');
-            }
+        it('The queue context should be cached', () => {
+            const fake = sinon.fake.returns({ url: 'test://test' });
+            BusService.__Rewire__('sqsQueueCoordsFromName', fake);
+            const busService = new BusService({ sqsClient: null, snsClient: null, options });
+            let result = busService.getIngestionQueueContext();
+            result = busService.getIngestionQueueContext();
+            expect(result.url).to.eqls('test://test');
+            expect(fake).to.be.calledOnce;
         });
     });
 
     describe('Pull back message', () => {
-
         it('Should pull back the message with success', async () => {
-            sqsQueueCoordsFromName.returns({ context: 'test-context' });
-            sqsSendMessage.resolves({ code: 'ok' });
+            BusService.__Rewire__('sqsQueueCoordsFromName', sinon.fake.returns({}));
+            BusService.__Rewire__('sqsSendMessage', sinon.fake.resolves({ code: 'ok' }));
+            const busService = new BusService({ sqsClient: null, snsClient: null, options });
             const result = await busService.pushBackMessage(message);
-            expect(result.code).to.eq('ok');
+            expect(result.code).to.equals('ok');
         });
-
         it('Should not pull back message because get ingestion context is failing', async () => {
-            sqsQueueCoordsFromName.returns(new Error('error'));
+            BusService.__Rewire__('sqsQueueCoordsFromName', sinon.fake.throws(new Error('42')));
+            const busService = new BusService({ sqsClient: null, snsClient: null, options });
+            let result;
             try {
-                await busService.pushBackMessage(message);
-            } catch (e) {
-                expect(e.message).to.eq('error');
+                result = await busService.pushBackMessage(message);
+            } catch (error) {
+                expect(error.message).to.equals('42');
             }
+            expect(result).to.be.undefined;
         });
         it('Should not pull back message because send message is failing', async () => {
-            sqsQueueCoordsFromName.returns({ context: 'test-context' });
-            sqsSendMessage.rejects({ message: 'error' });
+            BusService.__Rewire__('sqsQueueCoordsFromName', sinon.fake.returns({}));
+            BusService.__Rewire__('sqsSendMessage', sinon.fake.rejects(new Error('42')));
+            const busService = new BusService({ sqsClient: null, snsClient: null, options });
+            let result;
             try {
-                await busService.pushBackMessage(message);
-            } catch (e) {
-                expect(e.message).to.eq('error');
+                result = await busService.pushBackMessage(message);
+            } catch (error) {
+                expect(error.message).to.equals('42');
             }
+            expect(result).to.be.undefined;
         });
     });
 
     describe('Send telemetry', () => {
-
         it('Should send telemetry with success', async () => {
-            sqsQueueCoordsFromName.returns({ context: 'test-context' });
-            sqsSendMessage.resolves({ code: 'ok' });
+            BusService.__Rewire__('sqsQueueCoordsFromName', sinon.fake.returns({}));
+            BusService.__Rewire__('sqsSendMessage', sinon.fake.resolves({ code: 'ok' }));
+            const busService = new BusService({ sqsClient: null, snsClient: null, options });
             const result = await busService.sendTelemetry(message);
-            expect(result.code).to.eq('ok');
+            expect(result.code).to.equals('ok');
         });
-
         it('Should not send telemetry because get ingestion context is failing', async () => {
-            sqsQueueCoordsFromName.returns(new Error('error'));
+            BusService.__Rewire__('sqsQueueCoordsFromName', sinon.fake.throws(new Error('42')));
+            const busService = new BusService({ sqsClient: null, snsClient: null, options });
+            let result;
             try {
-                await busService.sendTelemetry(message);
-            } catch (e) {
-                expect(e.message).to.eq('error');
+                result = await busService.sendTelemetry(message);
+            } catch (error) {
+                expect(error.message).to.equals('42');
             }
+            expect(result).to.be.undefined;
         });
         it('Should not send telemetry because send message is failing', async () => {
-            sqsQueueCoordsFromName.returns({ context: 'test-context' });
-            sqsSendMessage.rejects({ message: 'error' });
+            BusService.__Rewire__('sqsQueueCoordsFromName', sinon.fake.returns({}));
+            BusService.__Rewire__('sqsSendMessage', sinon.fake.rejects(new Error('42')));
+            const busService = new BusService({ sqsClient: null, snsClient: null, options });
+            let result;
             try {
-                await busService.sendTelemetry(message);
-            } catch (e) {
-                expect(e.message).to.eq('error');
+                result = await busService.sendTelemetry(message);
+            } catch (error) {
+                expect(error.message).to.equals('42');
             }
+            expect(result).to.be.undefined;
         });
     });
 
     describe('Handle split', () => {
-
         it('Should send the split messages with success', async () => {
-            sqsQueueCoordsFromName.returns({ context: 'test-context' });
-            sqsSendMessageBatch.resolves({ code: 'ok' });
+            BusService.__Rewire__('sqsQueueCoordsFromName', sinon.fake.returns({}));
+            BusService.__Rewire__('sqsSendMessageBatch', sinon.fake.resolves({ code: 'ok' }));
+            const busService = new BusService({ sqsClient: null, snsClient: null, options });
             const result = await busService.handleSplit([ message ], messageLength);
-            expect(result.code).to.eq('ok');
+            expect(result.code).to.equals('ok');
         });
-
         it('Should not not send the split message because get ingestion context is failing', async () => {
-            sqsQueueCoordsFromName.returns(new Error('error'));
+            BusService.__Rewire__('sqsQueueCoordsFromName', sinon.fake.throws(new Error('42')));
+            const busService = new BusService({ sqsClient: null, snsClient: null, options });
+            let result;
             try {
-                await busService.handleSplit([ message ], messageLength);
-            } catch (e) {
-                expect(e.message).to.eq('error');
+                result = await busService.handleSplit([ message ], messageLength);
+            } catch (error) {
+                expect(error.message).to.equals('42');
             }
+            expect(result).to.be.undefined;
         });
         it('Should not not send the split message because send message in batch is failing', async () => {
-            sqsQueueCoordsFromName.returns({ context: 'test-context' });
-            sqsSendMessageBatch.rejects({ message: 'error' });
+            BusService.__Rewire__('sqsQueueCoordsFromName', sinon.fake.returns({}));
+            BusService.__Rewire__('sqsSendMessageBatch', sinon.fake.rejects(new Error('42')));
+            const busService = new BusService({ sqsClient: null, snsClient: null, options });
+            let result;
             try {
-                await busService.handleSplit([ message ], messageLength);
-            } catch (e) {
-                expect(e.message).to.eq('error');
+                result = await busService.handleSplit([ message ], messageLength);
+            } catch (error) {
+                expect(error.message).to.equals('42');
             }
+            expect(result).to.be.undefined;
         });
     });
 
     describe('Fanout message', () => {
-
         it('Should fanout a message with success', async () => {
-            fanout.resolves({ code: 'ok' });
+            BusService.__Rewire__('fanout', sinon.fake.resolves({ code: 'ok' }));
+            const busService = new BusService({ sqsClient: null, snsClient: null, options });
             const result = await busService.fanoutMessage(message, feeds, podId);
-            expect(result.code).to.eq('ok');
+            expect(result.code).to.equals('ok');
         });
-
         it('Should not fanout a message', async () => {
-            fanout.rejects({ message: 'error' });
+            BusService.__Rewire__('fanout', sinon.fake.rejects(new Error('42')));
+            const busService = new BusService({ sqsClient: null, snsClient: null, options });
+            let result;
             try {
-                await busService.fanoutMessage(message, feeds, podId);
-            } catch (e) {
-                expect(e.message).to.eq('error');
+                result = await busService.fanoutMessage(message, feeds, podId);
+            } catch (error) {
+                expect(error.message).to.equals('42');
             }
+            expect(result).to.be.undefined;
         });
     });
 
     describe('Broadcast message', () => {
-
         it('Should broadcast a message with success', async () => {
-            broadcast.resolves({ code: 'ok' });
+            BusService.__Rewire__('broadcast', sinon.fake.resolves({ code: 'ok' }));
+            const busService = new BusService({ sqsClient: null, snsClient: null, options });
             const result = await busService.broadcastMessage(message, podId);
-            expect(result.code).to.eq('ok');
+            expect(result.code).to.equals('ok');
         });
-
         it('Should not broadcast a message', async () => {
-            broadcast.rejects({ message: 'error' });
+            BusService.__Rewire__('broadcast', sinon.fake.rejects(new Error('42')));
+            const busService = new BusService({ sqsClient: null, snsClient: null, options });
+            let result;
             try {
-                await busService.broadcastMessage(message, podId);
-            } catch (e) {
-                expect(e.message).to.eq('error');
+                result = await busService.broadcastMessage(message, podId);
+            } catch (error) {
+                expect(error.message).to.equals('42');
             }
+            expect(result).to.be.undefined;
         });
     });
 
     describe('Send Recycling Feed', () => {
-
         it('Should send recycling feed with success', async () => {
-            sqsQueueCoordsFromName.resolves({ context: 'recycling-context' });
-            sqsSendMessage.resolves({ code: 'ok' });
+            BusService.__Rewire__('sqsQueueCoordsFromName', sinon.fake.returns({}));
+            BusService.__Rewire__('sqsSendMessage', sinon.fake.resolves({ code: 'ok' }));
+            const busService = new BusService({ sqsClient: null, snsClient: null, options });
             const result = await busService.sendRecycleFeed(message);
-            expect(result.code).to.eq('ok');
+            expect(result.code).to.equals('ok');
         });
-
         it('Should not send recycling feed because get ingestion context is failing', async () => {
-            sqsQueueCoordsFromName.returns(new Error('error'));
+            BusService.__Rewire__('sqsQueueCoordsFromName', sinon.fake.throws(new Error('42')));
+            const busService = new BusService({ sqsClient: null, snsClient: null, options });
+            let result;
             try {
-                await busService.sendRecycleFeed(message);
-            } catch (e) {
-                expect(e.message).to.eq('error');
+                result = await busService.sendRecycleFeed(message);
+            } catch (error) {
+                expect(error.message).to.equals('42');
             }
+            expect(result).to.be.undefined;
         });
-
         it('Should not send recycling feed because send message is failing', async () => {
-            sqsQueueCoordsFromName.resolves({ context: 'recycling-context' });
-            sqsSendMessage.rejects({ message: 'error' });
+            BusService.__Rewire__('sqsQueueCoordsFromName', sinon.fake.returns({}));
+            BusService.__Rewire__('sqsSendMessage', sinon.fake.rejects(new Error('42')));
+            const busService = new BusService({ sqsClient: null, snsClient: null, options });
+            let result;
             try {
-                await busService.sendRecycleFeed(message);
-            } catch (e) {
-                expect(e.message).to.eq('error');
+                result = await busService.sendRecycleFeed(message);
+            } catch (error) {
+                expect(error.message).to.equals('42');
             }
+            expect(result).to.be.undefined;
         });
     });
 });
