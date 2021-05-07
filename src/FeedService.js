@@ -4,7 +4,7 @@
 import _ from 'lodash';
 import { markFeedStale, removeFeeds } from 'symphony-datafeed-core';
 
-class FeedService {
+export default class FeedService {
 
     constructor({
         sqsClient, ddbDaxClient, ddbDirectClient, logger, options, busService
@@ -119,5 +119,3 @@ class FeedService {
     }
 
 }
-
-module.exports = FeedService;
