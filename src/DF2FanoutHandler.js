@@ -7,7 +7,7 @@ import Telemetry from './telemetry/Telemetry';
 import Metrics from './telemetry/Metrics';
 import MetricsConstants from './telemetry/MetricsConstants';
 
-class DF2FanoutHandler {
+export default class DF2FanoutHandler {
 
     constructor({
         databaseService, busService, objectStorageService, feedService, cacheRepoService, logger, options, hostname
@@ -616,5 +616,3 @@ class DF2FanoutHandler {
     }
 
 }
-
-module.exports = DF2FanoutHandler;
