@@ -1,4 +1,4 @@
-import s3GetObject from 'symphony-datafeed-core/s3GetObject';
+import { s3GetObject } from 'symphony-datafeed-core';
 
 export default class ObjectStorageService {
 

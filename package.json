@@ -5,7 +5,7 @@
   },
   "name": "fanout-common",
   "description": "Common code between the ecs-fanout and the lambda-fanout",
-  "version": "1.0.2",
+  "version": "2.0.0",
   "author": "Symphony",
   "license": "UNLICENSED",
   "main": "dist/index.js",
@@ -26,27 +26,27 @@
     }
   },
   "dependencies": {
-    "lodash": "4.17.20",
-    "symphony-datafeed-core": "3.2.7"
+    "lodash": "4.17.21",
+    "symphony-datafeed-core": "4.0.3"
   },
   "devDependencies": {
-    "@babel/cli": "7.12.13",
-    "@babel/core": "7.12.13",
-    "@babel/preset-env": "7.12.13",
-    "@babel/register": "7.12.13",
+    "@babel/cli": "7.13.16",
+    "@babel/core": "7.13.16",
+    "@babel/node": "7.13.13",
+    "@babel/preset-env": "7.13.15",
+    "@babel/register": "7.13.16",
     "babel-eslint": "10.1.0",
-    "babel-plugin-module-resolver": "4.1.0",
     "babel-plugin-rewire": "1.2.0",
-    "chai": "4.3.0",
+    "chai": "4.3.4",
     "chai-as-promised": "7.1.1",
-    "eslint": "7.19.0",
+    "eslint": "7.25.0",
     "eslint-config-airbnb-base": "14.2.1",
     "husky": "5.0.9",
-    "mocha": "8.2.1",
-    "mochawesome": "6.1.1",
+    "mocha": "8.3.2",
+    "mochawesome": "6.2.2",
     "nyc": "15.1.0",
-    "sinon": "9.2.4",
-    "sinon-chai": "3.5.0"
+    "sinon": "10.0.0",
+    "sinon-chai": "3.6.0"
   },
   "nyc": {
     "all": false,

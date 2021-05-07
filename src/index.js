@@ -1,10 +1,10 @@
-import BusService from './BusService';
-import DatabaseService from './DatabaseService';
-import DF2FanoutHandler from './DF2FanoutHandler';
-import FeedService from './FeedService';
-import ObjectStorageService from './ObjectStorageService';
+const BusService = require('./BusService').default;
+const DatabaseService = require('./DatabaseService').default;
+const DF2FanoutHandler = require('./DF2FanoutHandler').default;
+const FeedService = require('./FeedService').default;
+const ObjectStorageService = require('./ObjectStorageService').default;
 
-export {
+module.exports = {
     BusService,
     DatabaseService,
     DF2FanoutHandler,

@@ -1,21 +1,25 @@
-import findFeeds from 'symphony-datafeed-core/findFeeds';
+import { findFeeds } from 'symphony-datafeed-core';
 
 export default class DatabaseService {
 
-    constructor({ ddbDocumentClient, tableName, staleFeedsTtl }) {
-        this.ddbDocumentClient = ddbDocumentClient;
+    constructor({
+        daxClient, directClient, tableName, staleFeedsTtl
+    }) {
+        this.daxClient = daxClient;
+        this.directClient = directClient;
         this.tableName = tableName;
         this.staleFeedsTtl = staleFeedsTtl;
     }
 
     fetchFeeds(message, listOfIds) {
-        return findFeeds(
-            this.ddbDocumentClient,
-            this.tableName,
-            listOfIds,
-            this.staleFeedsTtl,
+        return findFeeds({
+            daxClient: this.daxClient,
+            directClient: this.directClient,
+            tableName: this.tableName,
+            staleFeedsTtl: this.staleFeedsTtl,
+            ids: listOfIds,
             message
-        );
+        });
     }
 
 }

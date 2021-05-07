@@ -1,9 +1,7 @@
-import _get from 'lodash/get';
-import sqsSendMessageBatch from 'symphony-datafeed-core/sqsSendMessageBatch';
-import broadcast from 'symphony-datafeed-core/broadcast';
-import fanout from 'symphony-datafeed-core/fanout';
-import sqsQueueCoordsFromName from 'symphony-datafeed-core/sqsQueueCoordsFromName';
-import sqsSendMessage from 'symphony-datafeed-core/sqsSendMessage';
+import _ from 'lodash';
+import {
+    broadcast, fanout, sqsQueueCoordsFromName, sqsSendMessage, sqsSendMessageBatch
+} from 'symphony-datafeed-core';
 
 export default class BusService {
 
@@ -11,13 +9,13 @@ export default class BusService {
         this.sqsClient = sqsClient;
         this.snsClient = snsClient;
 
-        this.aws = _get(options, 'aws');
-        this.feedQueuePrefix = _get(options, 'fanout.feedQueuePrefix');
-        this.topicNamePrefix = _get(options, 'fanout.messaging.broadcast.topicNamePrefix');
-        this.subscriptionQueueName = _get(options, 'fanout.messaging.broadcastSubscriptionQueue.name');
-        this.ingestionQueueName = _get(options, 'fanout.messaging.ingestionQueue.name');
-        this.useQueueUrlBuilderFromAWS = _get(options, 'sqs.endpoint');
-        this.telemetryIngestionQueueName = _get(options, 'telemetry.telemetryIngestionQueueName');
+        this.aws = _.get(options, 'aws');
+        this.feedQueuePrefix = _.get(options, 'fanout.feedQueuePrefix');
+        this.topicNamePrefix = _.get(options, 'fanout.messaging.broadcast.topicNamePrefix');
+        this.subscriptionQueueName = _.get(options, 'fanout.messaging.broadcastSubscriptionQueue.name');
+        this.ingestionQueueName = _.get(options, 'fanout.messaging.ingestionQueue.name');
+        this.useQueueUrlBuilderFromAWS = _.get(options, 'sqs.endpoint');
+        this.telemetryIngestionQueueName = _.get(options, 'telemetry.telemetryIngestionQueueName');
 
     }
 
@@ -71,7 +69,7 @@ export default class BusService {
          * the processing, giving some insight.
          *
          * In terms of costs there is no difference because nack or send count as a new request in
-         * SQS. In therms of performance there is no difference as well, neither in terms of
+         * SQS. In terms of performance there is no difference as well, neither in terms of
          * latency.
          */
 

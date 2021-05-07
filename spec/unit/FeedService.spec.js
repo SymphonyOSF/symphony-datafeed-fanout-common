@@ -1,186 +1,238 @@
-/* eslint-disable no-undef */
-/* eslint-disable no-unused-vars */
 /* eslint-disable no-unused-expressions */
-/* eslint-disable no-magic-numbers */
+/* eslint-disable no-undef */
 import { describe } from 'mocha';
-import chai from 'chai';
+import { expect } from 'chai';
 import sinon from 'sinon';
-import sinonChai from 'sinon-chai';
-import chaiAsPromised from 'chai-as-promised';
 
 import FeedService from '../../src/FeedService';
 
-chai.use(sinonChai);
-chai.use(chaiAsPromised);
-
-const expect = chai.expect;
-
 describe('FeedService Tests', () => {
+    afterEach(() => {
+        sinon.reset();
+        sinon.restore();
+        __rewire_reset_all__();
+    });
 
     const podId = 123;
-    const ddbDocumentClient = sinon.stub();
-    const sqsClient = sinon.stub();
-    const removeFeeds = sinon.stub();
+    const sqsClient = null;
+    const ddbDaxClient = null;
+    const ddbDirectClient = null;
     const options = {};
-    const busService = {
-        sendRecycleFeed: sinon.stub()
-    };
-    const updateDdbFields = sinon.stub();
-
+    const oneFeed = [
+        {
+            feedId: '1',
+            userId: 1,
+            feedsKey: 'mt:df:f:u:1'
+        }
+    ];
     const logger = {
-        debug: () => { },
-        info: () => { },
-        warn: () => { },
-        error: () => { },
+        warn: sinon.fake(),
+        debug: sinon.fake(),
     };
-
-    let feedService;
-
-    beforeEach(() => {
-        FeedService.__Rewire__('removeFeeds', removeFeeds);
-        FeedService.__Rewire__('updateDdbFields', updateDdbFields);
-        feedService = new FeedService({
-            sqsClient, ddbDocumentClient, options, busService, logger
-        });
-    });
-
-    afterEach(() => {
-        removeFeeds.reset();
-        busService.sendRecycleFeed.reset();
-        updateDdbFields.reset();
-    });
 
     describe('Remove invalid feeds', () => {
-
-        const feedsToBeDeleted = [
-            {
-                feedId: '1',
-                userId: 1,
-                feedsKey: 'mt:df:f:u:1'
-            }
-        ];
+        const busService = null;
         it('Should remove invalid feeds with success', async () => {
-            const expected = ([ [ Promise.resolve() ], Promise.resolve() ]);
-            removeFeeds.resolves(expected);
-            const result = await feedService.removeFeeds(feedsToBeDeleted, podId);
-            expect(result).to.be.equal(expected);
+            const fakeResult = [ [ Promise.resolve() ], Promise.resolve() ];
+            FeedService.__Rewire__('removeFeeds', sinon.fake.resolves(fakeResult));
+            const feedService = new FeedService({
+                sqsClient, ddbDaxClient, ddbDirectClient, options, busService, logger
+            });
+            const result = await feedService.removeFeeds(oneFeed, podId);
+            expect(result).to.equals(fakeResult);
+            expect(logger.warn).to.not.have.been.called;
         });
-
         it('Remove feeds should return an rejection', async () => {
-            removeFeeds.rejects({ message: 'error' });
+            FeedService.__Rewire__('removeFeeds', sinon.fake.rejects(new Error('42')));
+            const feedService = new FeedService({
+                sqsClient, ddbDaxClient, ddbDirectClient, options, busService, logger
+            });
+            let result;
             try {
-                await feedService.removeFeeds(feedsToBeDeleted, podId);
-            } catch (e) {
-                expect(e.message).to.eq('error');
+                result = await feedService.removeFeeds(oneFeed, podId);
+            } catch (error) {
+                expect(error.message).to.equals('42');
             }
+            expect(result).to.be.undefined;
+            expect(logger.warn).to.not.have.been.called;
+        });
+        it('Remove feeds should properly log removals - 1', async () => {
+            const localLogger = {
+                warn: sinon.fake(),
+                debug: sinon.fake(),
+            };
+            const fakeResult = [ [ { status: 'rejected' } ], { status: 'rejected' } ];
+            FeedService.__Rewire__('removeFeeds', sinon.fake.resolves(fakeResult));
+            const feedService = new FeedService({
+                sqsClient, ddbDaxClient, ddbDirectClient, options, busService, logger: localLogger
+            });
+            await feedService.removeFeeds(oneFeed, podId);
+            expect(localLogger.warn).to.have.been.calledTwice;
+        });
+        it('Remove feeds should properly log removals - 2', async () => {
+            const localLogger = {
+                warn: sinon.fake(),
+                debug: sinon.fake(),
+            };
+            const fakeResult = [ [ { status: 'rejected' } ], { status: 'fulfilled' } ];
+            FeedService.__Rewire__('removeFeeds', sinon.fake.resolves(fakeResult));
+            const feedService = new FeedService({
+                sqsClient, ddbDaxClient, ddbDirectClient, options, busService, logger: localLogger
+            });
+            await feedService.removeFeeds(oneFeed, podId);
+            expect(localLogger.warn).to.have.been.calledOnce;
+        });
+        it('Remove feeds should properly log removals - 3', async () => {
+            const localLogger = {
+                warn: sinon.fake(),
+                debug: sinon.fake(),
+            };
+            const fakeResult = [ [ { status: 'fulfilled' } ], { status: 'rejected' } ];
+            FeedService.__Rewire__('removeFeeds', sinon.fake.resolves(fakeResult));
+            const feedService = new FeedService({
+                sqsClient, ddbDaxClient, ddbDirectClient, options, busService, logger: localLogger
+            });
+            await feedService.removeFeeds(oneFeed, podId);
+            expect(localLogger.warn).to.have.been.calledOnce;
         });
     });
 
     describe('Update feeds to be stale', () => {
-
+        const busService = null;
         it('Should update the feeds to be stale', async () => {
-            const feedsToBeStale = [
-                {
-                    feedId: '1',
-                    userId: 1,
-                    feedsKey: 'mt:df:f:u:1'
-                }
-            ];
-            updateDdbFields.resolves();
-            const result = await feedService.updateFeedsToStale(feedsToBeStale, podId);
-            expect(result.numFeedUpdatedToStale).to.be.eq(1);
+            const localLogger = {
+                warn: sinon.fake(),
+                debug: sinon.fake(),
+            };
+            FeedService.__Rewire__('markFeedStale', sinon.fake.resolves());
+            const feedService = new FeedService({
+                sqsClient, ddbDaxClient, ddbDirectClient, options, busService, logger: localLogger
+            });
+            const result = await feedService.updateFeedsToStale(oneFeed, podId);
+            expect(result.numFeedUpdatedToStale).to.eqls(1);
+            expect(localLogger.warn).to.have.not.been.called;
+            expect(localLogger.debug).to.have.been.calledOnce;
         });
-
         it('Should fail update the feeds to be stale', async () => {
-            const feedsToBeStale = [
-                {
-                    feedId: '1',
-                    userId: 1,
-                    feedsKey: 'mt:df:f:u:1'
-                }
-            ];
-            updateDdbFields.rejects('Fail to update');
-            const result = await feedService.updateFeedsToStale(feedsToBeStale, podId);
-            expect(result.numFeedUpdatedToStale).to.be.eq(0);
+            const localLogger = {
+                warn: sinon.fake(),
+                debug: sinon.fake(),
+            };
+            FeedService.__Rewire__('markFeedStale', sinon.fake.rejects(new Error('42')));
+            const feedService = new FeedService({
+                sqsClient, ddbDaxClient, ddbDirectClient, options, busService, logger: localLogger
+            });
+            const result = await feedService.updateFeedsToStale(oneFeed, podId);
+            expect(result.numFeedUpdatedToStale).to.equals(0);
+            expect(localLogger.warn).to.have.been.calledOnce;
+            expect(localLogger.debug).to.have.been.calledOnce;
         });
-
         it('Should update one and fail another the feeds to be stale', async () => {
-            const feedsToBeStale = [
-                {
-                    feedId: '1',
-                    userId: 1,
-                    feedsKey: 'mt:df:f:u:1'
-                },
+            const localLogger = {
+                warn: sinon.fake(),
+                debug: sinon.fake(),
+            };
+            const twoFeeds = [
+                ...oneFeed,
                 {
                     feedId: '2',
                     userId: 2,
                     feedsKey: 'mt:df:f:u:2'
                 },
             ];
-            updateDdbFields.onCall(0).resolves();
-            updateDdbFields.onCall(1).rejects('Fail to update feed');
-            const result = await feedService.updateFeedsToStale(feedsToBeStale, podId);
+            const stubMarkFeedStale = sinon.stub();
+            FeedService.__Rewire__('markFeedStale', stubMarkFeedStale);
+            stubMarkFeedStale.onCall(0).resolves();
+            stubMarkFeedStale.onCall(1).rejects('Fail to update feed');
+            const feedService = new FeedService({
+                sqsClient, ddbDaxClient, ddbDirectClient, options, busService, logger: localLogger
+            });
+            const result = await feedService.updateFeedsToStale(twoFeeds, podId);
             expect(result.numFeedUpdatedToStale).to.be.eq(1);
+            expect(localLogger.warn).to.have.been.calledOnce;
+            expect(localLogger.debug).to.have.been.calledOnce;
         });
-
         it('Should do nothing when there no feeds', async () => {
-            const feedsToBeStale = [];
-            await feedService.updateFeedsToStale(feedsToBeStale, podId);
-            expect(updateDdbFields).to.have.been.not.called;
+            const fakeMarkFeedStale = sinon.fake();
+            FeedService.__Rewire__('markFeedStale', fakeMarkFeedStale);
+            const feedService = new FeedService({
+                sqsClient, ddbDaxClient, ddbDirectClient, options, busService, logger
+            });
+            await feedService.updateFeedsToStale([], podId);
+            expect(fakeMarkFeedStale).to.have.been.not.called;
         });
     });
 
     describe('Update feeds to be reuse', () => {
-
         it('Should update the feeds to be reuse', async () => {
-            const feedsToBeReuse = [
-                {
-                    feedId: '1',
-                    userId: 1,
-                    feedsKey: 'mt:df:f:u:1'
-                }
-            ];
-            busService.sendRecycleFeed.resolves();
-            const result = await feedService.updateFeedsToReuse(feedsToBeReuse, podId);
-            expect(result.numFeedUpdatedToReuse).to.be.eq(1);
+            const localLogger = {
+                warn: sinon.fake(),
+                debug: sinon.fake(),
+            };
+            const busService = {
+                sendRecycleFeed: sinon.fake.resolves()
+            };
+            const feedService = new FeedService({
+                sqsClient, ddbDaxClient, ddbDirectClient, options, busService, logger: localLogger
+            });
+            const result = await feedService.updateFeedsToReuse(oneFeed, podId);
+            expect(result.numFeedUpdatedToReuse).to.equals(1);
+            expect(localLogger.warn).to.have.not.been.called;
+            expect(localLogger.debug).to.have.been.calledOnce;
         });
-
         it('Should fail update the feeds to be reuse', async () => {
-            const feedsToBeReuse = [
-                {
-                    feedId: '1',
-                    userId: 1,
-                    feedsKey: 'mt:df:f:u:1'
-                }
-            ];
-            busService.sendRecycleFeed.rejects('Fail to update feed');
-            const result = await feedService.updateFeedsToReuse(feedsToBeReuse, podId);
-            expect(result.numFeedUpdatedToReuse).to.be.eq(0);
+            const localLogger = {
+                warn: sinon.fake(),
+                debug: sinon.fake(),
+            };
+            const busService = {
+                sendRecycleFeed: sinon.fake.rejects('Fail to update feed')
+            };
+            const feedService = new FeedService({
+                sqsClient, ddbDaxClient, ddbDirectClient, options, busService, logger: localLogger
+            });
+            const result = await feedService.updateFeedsToReuse(oneFeed, podId);
+            expect(result.numFeedUpdatedToReuse).to.equals(0);
+            expect(localLogger.warn).to.have.been.calledOnce;
+            expect(localLogger.debug).to.have.been.calledOnce;
         });
-
         it('Should update one and fail another the feeds to be reuse', async () => {
-            const feedsToBeReuse = [
-                {
-                    feedId: '1',
-                    userId: 1,
-                    feedsKey: 'mt:df:f:u:1'
-                },
+            const localLogger = {
+                warn: sinon.fake(),
+                debug: sinon.fake(),
+            };
+            const twoFeeds = [
+                ...oneFeed,
                 {
                     feedId: '2',
                     userId: 2,
                     feedsKey: 'mt:df:f:u:2'
                 },
             ];
-            busService.sendRecycleFeed.onCall(0).resolves();
-            busService.sendRecycleFeed.onCall(1).rejects('Fail to update feed');
-            const result = await feedService.updateFeedsToReuse(feedsToBeReuse, podId);
-            expect(result.numFeedUpdatedToReuse).to.be.eq(1);
+            const stubSendRecycleFeed = sinon.stub();
+            const busService = {
+                sendRecycleFeed: stubSendRecycleFeed
+            };
+            stubSendRecycleFeed.onCall(0).resolves();
+            stubSendRecycleFeed.onCall(1).rejects('Fail to update feed');
+            const feedService = new FeedService({
+                sqsClient, ddbDaxClient, ddbDirectClient, options, busService, logger: localLogger
+            });
+            const result = await feedService.updateFeedsToReuse(twoFeeds, podId);
+            expect(result.numFeedUpdatedToReuse).to.equals(1);
+            expect(localLogger.warn).to.have.been.calledOnce;
+            expect(localLogger.debug).to.have.been.calledOnce;
         });
-
         it('Should do nothing when there no feeds to be reuse', async () => {
-            const feedsToBeReuse = [];
-            await feedService.updateFeedsToReuse(feedsToBeReuse, podId);
-            expect(busService.sendRecycleFeed).to.have.been.not.called;
+            const stubSendRecycleFeed = sinon.stub();
+            const busService = {
+                sendRecycleFeed: stubSendRecycleFeed
+            };
+            const feedService = new FeedService({
+                sqsClient, ddbDaxClient, ddbDirectClient, options, busService, logger
+            });
+            await feedService.updateFeedsToReuse([], podId);
+            expect(stubSendRecycleFeed).to.have.been.not.called;
         });
     });
 
@@ -207,23 +259,22 @@ describe('FeedService Tests', () => {
             }
         ];
 
-        beforeEach(async ()=> {
-            removeFeeds.resolves();
-            busService.sendRecycleFeed.resolves();
-            updateDdbFields.resolves();
+        it('recyclyingFeeds() should update the stale/reuse feeds', async () => {
+            const fakeRemoveFeeds = sinon.fake.resolves();
+            const fakeSendRecycleFeed = sinon.fake.resolves();
+            const fakeMarkFeedStale = sinon.fake.resolves();
+            const busService = {
+                sendRecycleFeed: fakeSendRecycleFeed
+            };
+            FeedService.__Rewire__('removeFeeds', fakeRemoveFeeds);
+            FeedService.__Rewire__('markFeedStale', fakeMarkFeedStale);
+            const feedService = new FeedService({
+                sqsClient, ddbDaxClient, ddbDirectClient, options, busService, logger
+            });
             await feedService.recyclingFeeds(feedsToStale, feedsToReuse, feedsToRemove, podId);
-        });
-
-        it('should update the stale feeds', () => {
-            expect(updateDdbFields).to.have.been.calledOnce;
-        });
-
-        it('should update the resue feeds', () => {
-            expect(busService.sendRecycleFeed).to.have.been.calledOnce;
-        });
-
-        it('should update the stale feeds', () => {
-            expect(removeFeeds).to.have.been.calledOnce;
+            expect(fakeMarkFeedStale).to.have.been.calledOnce;
+            expect(fakeSendRecycleFeed).to.have.been.calledOnce;
+            expect(fakeRemoveFeeds).to.have.been.calledOnce;
         });
     });
 });

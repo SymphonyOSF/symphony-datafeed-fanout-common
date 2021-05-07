@@ -1,21 +1,18 @@
-/* eslint-disable no-undef */
-/* eslint-disable no-unused-vars */
-/* eslint-disable no-unused-expressions */
 /* eslint-disable no-magic-numbers */
+/* eslint-disable no-unused-expressions */
+/* eslint-disable no-undef */
 import { describe } from 'mocha';
 import chai, { expect } from 'chai';
 import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
-import chaiAsPromised from 'chai-as-promised';
-import DF2Constants from 'symphony-datafeed-core/DF2Constants';
+
+chai.use(sinonChai);
+
+import { DF2Constants } from 'symphony-datafeed-core';
 
 import DF2FanoutHandler from '../../src/DF2FanoutHandler';
 
-chai.use(sinonChai);
-chai.use(chaiAsPromised);
-
 describe('DF2FanoutHandler Tests', () => {
-
     const options = {
         environment: 'dev',
         cache: {
@@ -37,101 +34,64 @@ describe('DF2FanoutHandler Tests', () => {
             isExportationActivated: 1
         }
     };
-    const busService = {
-        fanoutMessage: sinon.stub(),
-        handleSplit: sinon.stub(),
-        broadcastMessage: sinon.stub(),
-        pushBackMessage: sinon.stub(),
-        sendTelemetry: sinon.stub()
-    };
-    const databaseService = {
-        fetchFeeds: sinon.stub()
-    };
-    const objectStorageService = {
-        getPayload: sinon.stub()
-    };
-    const cacheRepoService = {
-        set: sinon.stub()
-    };
-    const feedService = {
-        removeFeeds: sinon.stub(),
-        recyclingFeeds: sinon.stub(),
-    };
-    const hostname = 'host01';
-
     const logger = {
-        debug: () => { },
-        info: () => { },
-        warn: () => { },
-        error: () => { },
+        debug: sinon.fake(),
+        info: sinon.fake(),
+        warn: sinon.fake(),
+        error: sinon.fake(),
     };
-
-    let df2FanoutService;
-
-    beforeEach(() => {
-        df2FanoutService = new DF2FanoutHandler({
-            databaseService, busService, objectStorageService, feedService, cacheRepoService, options, hostname, logger
-        });
-    });
 
     afterEach(() => {
-        objectStorageService.getPayload.reset();
-        cacheRepoService.set.reset();
-        databaseService.fetchFeeds.reset();
-        busService.fanoutMessage.reset();
-        busService.handleSplit.reset();
-        busService.broadcastMessage.reset();
-        busService.pushBackMessage.reset();
-        busService.sendTelemetry.reset();
-        feedService.removeFeeds.reset();
-        feedService.recyclingFeeds.reset();
+        sinon.reset();
+        sinon.restore();
     });
 
     describe('Consume records', () => {
-
         describe('Adapt message errors', () => {
-
-            it('Missing body property in the message', done => {
+            it('Missing body property in the message', async () => {
+                const fanoutService = new DF2FanoutHandler({ logger });
                 const record = {
                     messageId: '1'
                 };
                 const records = [ record ];
-                const result = df2FanoutService.consume(records);
-                result.catch(error => {
+                let result;
+                try {
+                    result = await fanoutService.consume(records);
+                } catch (error) {
                     expect(error.discardOriginalMessage).to.be.true;
                     expect(error.message).to.eq('Missing params in the message');
-                    done();
-                });
+                }
+                expect(result).to.be.undefined;
             });
-
-            it('Missing messageId property in the message', done => {
+            it('Missing messageId property in the message', async () => {
+                const fanoutService = new DF2FanoutHandler({ logger });
                 const record = {
                     body: { test: 1 }
                 };
                 const records = [ record ];
-                const result = df2FanoutService.consume(records);
-                result.catch(error => {
+                let result;
+                try {
+                    result = await fanoutService.consume(records);
+                } catch (error) {
                     expect(error.discardOriginalMessage).to.be.true;
                     expect(error.message).to.eq('Missing params in the message');
-                    done();
-                });
+                }
+                expect(result).to.be.undefined;
             });
-
-            it('Body has an invalid JSON', done => {
+            it('Body has an invalid JSON - should ignore and ack', async () => {
+                const fanoutService = new DF2FanoutHandler({ logger });
                 const record = {
                     messageId: '1',
                     body: 'invalid'
                 };
                 const records = [ record ];
-                const result = df2FanoutService.consume(records);
-                result.then(data => {
-                    expect(data[ 0 ].messageId).to.eq(record.messageId);
-                    expect(data[ 0 ].isProcessed).to.be.true;
-                    done();
-                });
+                const result = await fanoutService.consume(records);
+                expect(result[ 0 ].data).to.be.undefined;
+                expect(result[ 0 ].messageId).to.eq(record.messageId);
+                expect(result[ 0 ].isProcessed).to.be.true;
             });
-
-            it('Message is not a raw message', done => {
+            it('Message is not a raw message - should ignore and ack', async () => {
+                const fanoutService = new DF2FanoutHandler({ logger });
                 const rawBody = {
                     Message: {}
                 };
@@ -140,34 +100,30 @@ describe('DF2FanoutHandler Tests', () => {
                     body: JSON.stringify(rawBody)
                 };
                 const records = [ record ];
-                const result = df2FanoutService.consume(records);
-                result.then(data => {
-                    expect(data[ 0 ].messageId).to.eq(record.messageId);
-                    expect(data[ 0 ].isProcessed).to.be.true;
-                    done();
-                });
+                const result = await fanoutService.consume(records);
+                expect(result[ 0 ].data).to.be.undefined;
+                expect(result[ 0 ].messageId).to.eq(record.messageId);
+                expect(result[ 0 ].isProcessed).to.be.true;
             });
         });
     });
 
     describe('Parse message errors', () => {
-
-        it('Is a raw data but message data has an invalid json string', done => {
+        it('Is a raw data but message data has an invalid json string', async () => {
+            const fanoutService = new DF2FanoutHandler({ logger });
             const body = 'invalid';
             const record = {
                 messageId: '1',
                 body: JSON.stringify(body)
             };
             const records = [ record ];
-            const result = df2FanoutService.consume(records);
-            result.then(data => {
-                expect(data[ 0 ].messageId).to.eq(record.messageId);
-                expect(data[ 0 ].isProcessed).to.be.true;
-                done();
-            });
+            const result = await fanoutService.consume(records);
+            expect(result[ 0 ].messageId).to.eq(record.messageId);
+            expect(result[ 0 ].isProcessed).to.be.true;
         });
 
-        it('Message data attribute has an invalid payload', done => {
+        it('Message data attribute has an invalid payload', async () => {
+            const fanoutService = new DF2FanoutHandler({ logger });
             const body = {
                 payload: 0xFF
             };
@@ -176,33 +132,31 @@ describe('DF2FanoutHandler Tests', () => {
                 body: JSON.stringify(body)
             };
             const records = [ record ];
-            const result = df2FanoutService.consume(records);
-            result.then(data => {
-                expect(data[ 0 ].messageId).to.eq(record.messageId);
-                expect(data[ 0 ].isProcessed).to.be.true;
-                done();
-            });
+            const result = await fanoutService.consume(records);
+            expect(result[ 0 ].messageId).to.eq(record.messageId);
+            expect(result[ 0 ].isProcessed).to.be.true;
         });
 
-        it('Missing payload and s3 is returning an invalid payload', done => {
+        it('Missing payload and s3 is returning an invalid payload', async () => {
+            const objectStorageService = {
+                getPayload: sinon.fake.resolves('invalid')
+            };
+            const fanoutService = new DF2FanoutHandler({ logger, objectStorageService });
             const body = {};
             const record = {
                 messageId: '1',
                 body: JSON.stringify(body)
             };
             const records = [ record ];
-            objectStorageService.getPayload.resolves('invalid');
-            const result = df2FanoutService.consume(records);
-            result.then(data => {
-                expect(data[ 0 ].messageId).to.eq(record.messageId);
-                expect(data[ 0 ].isProcessed).to.be.true;
-                done();
-            });
+            const result = await fanoutService.consume(records);
+            expect(result[ 0 ].messageId).to.eq(record.messageId);
+            expect(result[ 0 ].isProcessed).to.be.true;
         });
     });
 
     describe('Messages allowed', () => {
-        it('Not allowed payload type', done => {
+        it('Not allowed payload type', async () => {
+            const fanoutService = new DF2FanoutHandler({ logger });
             const payload = {
                 podId: 1,
                 payloadType: 'com.symphony.s2.model.chat.MaestroMessage.INVALID'
@@ -215,15 +169,16 @@ describe('DF2FanoutHandler Tests', () => {
                 body: JSON.stringify(body)
             };
             const records = [ record ];
-            const result = df2FanoutService.consume(records);
-            result.then(data => {
-                expect(data[ 0 ].messageId).to.eq(record.messageId);
-                expect(data[ 0 ].isProcessed).to.be.true;
-                done();
-            });
+            const result = await fanoutService.consume(records);
+            expect(result[ 0 ].messageId).to.eq(record.messageId);
+            expect(result[ 0 ].isProcessed).to.be.true;
         });
 
-        it('JOIN_ROOM - pending is missing', done => {
+        it('JOIN_ROOM - pending is missing', async () => {
+            const busService = {
+                pushBackMessage: sinon.fake.resolves()
+            };
+            const fanoutService = new DF2FanoutHandler({ logger, busService });
             const payload = {
                 podId: 1,
                 payloadType: 'com.symphony.s2.model.chat.MaestroMessage.JOIN_ROOM',
@@ -237,18 +192,15 @@ describe('DF2FanoutHandler Tests', () => {
                 body: JSON.stringify(body)
             };
             const records = [ record ];
-            const result = df2FanoutService.consume(records);
-            result.then(data => {
-                expect(data[ 0 ].messageId).to.eq(record.messageId);
-                expect(data[ 0 ].isProcessed).to.be.true;
-                done();
-            });
+            const result = await fanoutService.consume(records);
+            expect(result[ 0 ].messageId).to.eq(record.messageId);
+            expect(result[ 0 ].isProcessed).to.be.true;
         });
     });
 
     describe('Validation message errors', () => {
-
-        it('Payload type is missing', done => {
+        it('Payload type is missing', async () => {
+            const fanoutService = new DF2FanoutHandler({ logger });
             const payload = {};
             const body = {
                 payload: Buffer.from(JSON.stringify(payload)).toString('base64')
@@ -258,15 +210,12 @@ describe('DF2FanoutHandler Tests', () => {
                 body: JSON.stringify(body)
             };
             const records = [ record ];
-            const result = df2FanoutService.consume(records);
-            result.then(data => {
-                expect(data[ 0 ].messageId).to.eq(record.messageId);
-                expect(data[ 0 ].isProcessed).to.be.true;
-                done();
-            });
+            const result = await fanoutService.consume(records);
+            expect(result[ 0 ].messageId).to.eq(record.messageId);
+            expect(result[ 0 ].isProcessed).to.be.true;
         });
-
-        it('Payload type is null', done => {
+        it('Payload type is null', async () => {
+            const fanoutService = new DF2FanoutHandler({ logger });
             const payload = {
                 payloadType: null
             };
@@ -278,15 +227,12 @@ describe('DF2FanoutHandler Tests', () => {
                 body: JSON.stringify(body)
             };
             const records = [ record ];
-            const result = df2FanoutService.consume(records);
-            result.then(data => {
-                expect(data[ 0 ].messageId).to.eq(record.messageId);
-                expect(data[ 0 ].isProcessed).to.be.true;
-                done();
-            });
+            const result = await fanoutService.consume(records);
+            expect(result[ 0 ].messageId).to.eq(record.messageId);
+            expect(result[ 0 ].isProcessed).to.be.true;
         });
-
-        it('Missing pod id', done => {
+        it('Missing pod id', async () => {
+            const fanoutService = new DF2FanoutHandler({ logger });
             const payload = {
                 payloadType: 'com.symphony.s2.model.chat.SocialMessage'
             };
@@ -298,15 +244,12 @@ describe('DF2FanoutHandler Tests', () => {
                 body: JSON.stringify(body)
             };
             const records = [ record ];
-            const result = df2FanoutService.consume(records);
-            result.then(data => {
-                expect(data[ 0 ].messageId).to.eq(record.messageId);
-                expect(data[ 0 ].isProcessed).to.be.true;
-                done();
-            });
+            const result = await fanoutService.consume(records);
+            expect(result[ 0 ].messageId).to.eq(record.messageId);
+            expect(result[ 0 ].isProcessed).to.be.true;
         });
-
-        it('Message is expired', done => {
+        it('Message is expired', async () => {
+            const fanoutService = new DF2FanoutHandler({ logger });
             const payload = {
                 payloadType: 'com.symphony.s2.model.chat.Typing',
                 podId: 1,
@@ -320,12 +263,9 @@ describe('DF2FanoutHandler Tests', () => {
                 body: JSON.stringify(body)
             };
             const records = [ record ];
-            const result = df2FanoutService.consume(records);
-            result.then(data => {
-                expect(data[ 0 ].messageId).to.eq(record.messageId);
-                expect(data[ 0 ].isProcessed).to.be.true;
-                done();
-            });
+            const result = await fanoutService.consume(records);
+            expect(result[ 0 ].messageId).to.eq(record.messageId);
+            expect(result[ 0 ].isProcessed).to.be.true;
         });
     });
 
@@ -342,50 +282,51 @@ describe('DF2FanoutHandler Tests', () => {
             messageId: '1',
             body: JSON.stringify(body)
         };
-
-        it('Sending broadcast message with success', done => {
-            busService.broadcastMessage.resolves(true);
+        it('Sending broadcast message with success', async () => {
+            const busService = {
+                broadcastMessage: sinon.fake.resolves()
+            };
+            const fanoutService = new DF2FanoutHandler({ logger, busService });
             const records = [ record ];
-            const result = df2FanoutService.consume(records);
-            result.then(data => {
-                expect(data[ 0 ].messageId).to.eq(record.messageId);
-                expect(data[ 0 ].isProcessed).to.be.true;
-                done();
-            });
+            const result = await fanoutService.consume(records);
+            expect(result[ 0 ].messageId).to.eq(record.messageId);
+            expect(result[ 0 ].isProcessed).to.be.true;
         });
-
-        it('Error sending broadcast message - discard original message', done => {
-            busService.broadcastMessage.rejects(new Error('topic does not exist'));
+        it('Error sending broadcast message - discard original message', async () => {
+            const busService = {
+                broadcastMessage: sinon.fake.rejects('topic does not exist')
+            };
+            const fanoutService = new DF2FanoutHandler({ logger, busService });
             const records = [ record ];
-            const result = df2FanoutService.consume(records);
-            result.then(data => {
-                expect(data[ 0 ].messageId).to.eq(record.messageId);
-                expect(data[ 0 ].isProcessed).to.be.true;
-                done();
-            });
+            const result = await fanoutService.consume(records);
+            expect(result[ 0 ].messageId).to.eq(record.messageId);
+            expect(result[ 0 ].isProcessed).to.be.true;
         });
-
-        it('Error sending broadcast message - do not discard original message - push back ok', done => {
-            busService.broadcastMessage.rejects(new Error('Any other error'));
-            busService.pushBackMessage.resolves(true);
+        it('Error sending broadcast message - do not discard original message - push back ok', async () => {
+            const busService = {
+                broadcastMessage: sinon.fake.rejects('Any other error'),
+                pushBackMessage: sinon.fake.resolves(true)
+            };
+            const fanoutService = new DF2FanoutHandler({ logger, busService });
             const records = [ record ];
-            const result = df2FanoutService.consume(records);
-            result.then(data => {
-                expect(data[ 0 ].messageId).to.eq(record.messageId);
-                expect(data[ 0 ].isProcessed).to.be.true;
-                done();
-            });
+            const result = await fanoutService.consume(records);
+            expect(result[ 0 ].messageId).to.eq(record.messageId);
+            expect(result[ 0 ].isProcessed).to.be.true;
         });
-
-        it('Error sending broadcast message - do not discard original message - push back error', done => {
-            busService.broadcastMessage.rejects(new Error('Any other error'));
-            busService.pushBackMessage.rejects({ code: 'pushBackError' });
+        it('Error sending broadcast message - do not discard original message - push back error', async () => {
+            const busService = {
+                broadcastMessage: sinon.fake.rejects('Any other error'),
+                pushBackMessage: sinon.fake.rejects('Pushback Error')
+            };
+            const fanoutService = new DF2FanoutHandler({ logger, busService });
             const records = [ record ];
-            const result = df2FanoutService.consume(records);
-            result.catch(error => {
-                expect(error.code).to.eq('pushBackError');
-                done();
-            });
+            let result;
+            try {
+                result = await fanoutService.consume(records);
+            } catch (error) {
+                expect(error.message).to.equals('Pushback Error');
+            }
+            expect(result).to.be.undefined;
         });
     });
 
@@ -402,28 +343,31 @@ describe('DF2FanoutHandler Tests', () => {
             messageId: '1',
             body: JSON.stringify(body)
         };
-
-        it('Must split message - pull back ok', done => {
-            busService.handleSplit.rejects({ message: 'error during sending splits' });
-            busService.pushBackMessage.resolves(true);
+        it('Must split message - pull back ok', async () => {
+            const busService = {
+                handleSplit: sinon.fake.rejects('error during sending splits'),
+                pushBackMessage: sinon.fake.resolves(true)
+            };
+            const fanoutService = new DF2FanoutHandler({ logger, busService });
             const records = [ record ];
-            const result = df2FanoutService.consume(records);
-            result.then(data => {
-                expect(data[ 0 ].messageId).to.eq(record.messageId);
-                expect(data[ 0 ].isProcessed).to.be.true;
-                done();
-            });
+            const result = await fanoutService.consume(records);
+            expect(result[ 0 ].messageId).to.eq(record.messageId);
+            expect(result[ 0 ].isProcessed).to.be.true;
         });
-
-        it('Must split message - pull back error', done => {
-            busService.handleSplit.rejects({ message: 'error during sending splits' });
-            busService.pushBackMessage.rejects({ code: 'pullBackError' });
+        it('Must split message - pull back error', async () => {
+            const busService = {
+                handleSplit: sinon.fake.rejects('error during sending splits'),
+                pushBackMessage: sinon.fake.rejects('Pushback Error')
+            };
+            const fanoutService = new DF2FanoutHandler({ logger, busService });
             const records = [ record ];
-            const result = df2FanoutService.consume(records);
-            result.catch(error => {
-                expect(error.code).to.eq('pullBackError');
-                done();
-            });
+            let result;
+            try {
+                result = await fanoutService.consume(records);
+            } catch (error) {
+                expect(error.message).to.equals('Pushback Error');
+            }
+            expect(result).to.be.undefined;
         });
     });
 
@@ -440,28 +384,35 @@ describe('DF2FanoutHandler Tests', () => {
             messageId: '1',
             body: JSON.stringify(body)
         };
-
-        it('Fetch feeds is throwing an exception - pull back ok', done => {
-            busService.pushBackMessage.resolves(true);
-            databaseService.fetchFeeds.rejects({ message: 'error' });
+        it('Fetch feeds is throwing an exception - pull back ok', async () => {
+            const busService = {
+                pushBackMessage: sinon.fake.resolves(true)
+            };
+            const databaseService = {
+                fetchFeeds: sinon.fake.rejects('error')
+            };
+            const fanoutService = new DF2FanoutHandler({ logger, busService, databaseService });
             const records = [ record ];
-            const result = df2FanoutService.consume(records);
-            result.then(data => {
-                expect(data[ 0 ].messageId).to.eq(record.messageId);
-                expect(data[ 0 ].isProcessed).to.be.true;
-                done();
-            });
+            const result = await fanoutService.consume(records);
+            expect(result[ 0 ].messageId).to.eq(record.messageId);
+            expect(result[ 0 ].isProcessed).to.be.true;
         });
-
-        it('Fetch feeds is throwing an exception - pull back error', done => {
-            busService.pushBackMessage.rejects({ code: 'pullBackError' });
-            databaseService.fetchFeeds.rejects({ message: 'error' });
+        it('Fetch feeds is throwing an exception - pull back error', async () => {
+            const busService = {
+                pushBackMessage: sinon.fake.rejects('Pushback Error')
+            };
+            const databaseService = {
+                fetchFeeds: sinon.fake.rejects('error')
+            };
+            const fanoutService = new DF2FanoutHandler({ logger, busService, databaseService });
             const records = [ record ];
-            const result = df2FanoutService.consume(records);
-            result.catch(error => {
-                expect(error.code).to.eq('pullBackError');
-                done();
-            });
+            let result;
+            try {
+                result = await fanoutService.consume(records);
+            } catch (error) {
+                expect(error.message).to.equals('Pushback Error');
+            }
+            expect(result).to.be.undefined;
         });
     });
 
@@ -484,8 +435,7 @@ describe('DF2FanoutHandler Tests', () => {
                 SentTimestamp: dateNow - 100,
             }
         };
-
-        it('Fanout feeds is returning only one promise rejected', done => {
+        it('Fanout feeds is returning only one promise rejected', async () => {
             const fetchFeedsResult = {
                 feeds: [
                     {
@@ -507,19 +457,20 @@ describe('DF2FanoutHandler Tests', () => {
                     message: 'error fetching feed'
                 }
             ];
-            busService.pushBackMessage.resolves(true);
-            databaseService.fetchFeeds.resolves(fetchFeedsResult);
-            busService.fanoutMessage.resolves(fanoutFeedsResult);
+            const busService = {
+                pushBackMessage: sinon.fake.resolves(true),
+                fanoutMessage: sinon.fake.resolves(fanoutFeedsResult)
+            };
+            const databaseService = {
+                fetchFeeds: sinon.fake.resolves(fetchFeedsResult)
+            };
+            const fanoutService = new DF2FanoutHandler({ logger, busService, databaseService });
             const records = [ record ];
-            const result = df2FanoutService.consume(records);
-            result.then(data => {
-                expect(data[ 0 ].messageId).to.eq(record.messageId);
-                expect(data[ 0 ].isProcessed).to.be.true;
-                done();
-            });
+            const result = await fanoutService.consume(records);
+            expect(result[ 0 ].messageId).to.eq(record.messageId);
+            expect(result[ 0 ].isProcessed).to.be.true;
         });
-
-        it('Fanout feeds - ok', done => {
+        it('Fanout feeds - ok', async () => {
             const fetchFeedsResult = {
                 feeds: [
                     {
@@ -535,7 +486,6 @@ describe('DF2FanoutHandler Tests', () => {
                     },
                     {
                         feedId: '4',
-
                     }
                 ]
             };
@@ -550,19 +500,25 @@ describe('DF2FanoutHandler Tests', () => {
                 }
             ];
             const removeFeedsResult = [];
-            databaseService.fetchFeeds.resolves(fetchFeedsResult);
-            busService.fanoutMessage.resolves(fanoutFeedsResult);
-            feedService.removeFeeds.resolves(removeFeedsResult);
-            const records = [ record ];
-            const result = df2FanoutService.consume(records);
-            result.then(data => {
-                expect(data[ 0 ].messageId).to.eq(record.messageId);
-                expect(data[ 0 ].isProcessed).to.be.true;
-                done();
+            const busService = {
+                pushBackMessage: sinon.fake.resolves(true),
+                fanoutMessage: sinon.fake.resolves(fanoutFeedsResult)
+            };
+            const databaseService = {
+                fetchFeeds: sinon.fake.resolves(fetchFeedsResult)
+            };
+            const feedService = {
+                removeFeeds: sinon.fake.resolves(removeFeedsResult)
+            };
+            const fanoutService = new DF2FanoutHandler({
+                logger, busService, databaseService, feedService
             });
+            const records = [ record ];
+            const result = await fanoutService.consume(records);
+            expect(result[ 0 ].messageId).to.eq(record.messageId);
+            expect(result[ 0 ].isProcessed).to.be.true;
         });
-
-        it('Fanout feeds - ok - telemetry exportation failing', done => {
+        it('Fanout feeds - ok - telemetry exportation failing', async () => {
             const fetchFeedsResult = {
                 feeds: [
                     {
@@ -585,20 +541,25 @@ describe('DF2FanoutHandler Tests', () => {
                 }
             ];
             const removeFeedsResult = [];
-            databaseService.fetchFeeds.resolves(fetchFeedsResult);
-            busService.fanoutMessage.resolves(fanoutFeedsResult);
-            feedService.removeFeeds.resolves(removeFeedsResult);
-            busService.sendTelemetry.rejects({ error: 'error' });
-            const records = [ record ];
-            const result = df2FanoutService.consume(records);
-            result.then(data => {
-                expect(data[ 0 ].messageId).to.eq(record.messageId);
-                expect(data[ 0 ].isProcessed).to.be.true;
-                done();
+            const busService = {
+                fanoutMessage: sinon.fake.resolves(fanoutFeedsResult),
+                sendTelemetry: sinon.fake.rejects('error')
+            };
+            const databaseService = {
+                fetchFeeds: sinon.fake.resolves(fetchFeedsResult)
+            };
+            const feedService = {
+                removeFeeds: sinon.fake.resolves(removeFeedsResult)
+            };
+            const fanoutService = new DF2FanoutHandler({
+                logger, busService, databaseService, feedService
             });
+            const records = [ record ];
+            const result = await fanoutService.consume(records);
+            expect(result[ 0 ].messageId).to.eq(record.messageId);
+            expect(result[ 0 ].isProcessed).to.be.true;
         });
-
-        it('Fanout feeds - ok - more than one record', done => {
+        it('Fanout feeds - ok - more than one record', async () => {
             const fetchFeedsResult = {
                 feeds: [
                     {
@@ -621,19 +582,24 @@ describe('DF2FanoutHandler Tests', () => {
                 }
             ];
             const removeFeedsResult = [];
-            databaseService.fetchFeeds.resolves(fetchFeedsResult);
-            busService.fanoutMessage.resolves(fanoutFeedsResult);
-            feedService.removeFeeds.resolves(removeFeedsResult);
+            const busService = {
+                fanoutMessage: sinon.fake.resolves(fanoutFeedsResult),
+            };
+            const databaseService = {
+                fetchFeeds: sinon.fake.resolves(fetchFeedsResult)
+            };
+            const feedService = {
+                removeFeeds: sinon.fake.resolves(removeFeedsResult)
+            };
+            const fanoutService = new DF2FanoutHandler({
+                logger, busService, databaseService, feedService
+            });
             const records = [ record, record, record ];
-            const result = df2FanoutService.consume(records);
-            result.then(data => {
-                expect(data[ 0 ].messageId).to.eq(record.messageId);
-                expect(data[ 0 ].isProcessed).to.be.true;
-                done();
-            });
+            const result = await fanoutService.consume(records);
+            expect(result[ 0 ].messageId).to.eq(record.messageId);
+            expect(result[ 0 ].isProcessed).to.be.true;
         });
-
-        it('Fanout feeds - reinserted message', done => {
+        it('Fanout feeds - reinserted message', async () => {
             const internalData = {
                 originalMessageId: '1',
                 isSplit: true, // this is the identification for a reinserted message
@@ -677,19 +643,30 @@ describe('DF2FanoutHandler Tests', () => {
                 }
             ];
             const removeFeedsResult = [];
-            databaseService.fetchFeeds.resolves(fetchFeedsResult);
-            busService.fanoutMessage.resolves(fanoutFeedsResult);
-            feedService.removeFeeds.resolves(removeFeedsResult);
-            const records = [ recordForReinsertedMessage ];
-            const result = df2FanoutService.consume(records);
-            result.then(data => {
-                expect(data[ 0 ].messageId).to.eq(internalData.originalMessageId);
-                expect(data[ 0 ].isProcessed).to.be.true;
-                done();
+            const busService = {
+                fanoutMessage: sinon.fake.resolves(fanoutFeedsResult),
+            };
+            const databaseService = {
+                fetchFeeds: sinon.fake.resolves(fetchFeedsResult)
+            };
+            const feedService = {
+                removeFeeds: sinon.fake.resolves(removeFeedsResult)
+            };
+            const fanoutService = new DF2FanoutHandler({
+                logger, busService, databaseService, feedService
             });
+            const records = [ recordForReinsertedMessage ];
+            const result = await fanoutService.consume(records);
+            expect(result[ 0 ].messageId).to.eq(internalData.originalMessageId);
+            expect(result[ 0 ].isProcessed).to.be.true;
         });
-
-        it('Fanout feeds - split message', done => {
+        it('Fanout feeds - split message', async () => {
+            const busService = {
+                pushBackMessage: sinon.fake.resolves(),
+            };
+            const fanoutService = new DF2FanoutHandler({
+                logger, busService
+            });
             const tempData = {
                 payloadType: 'com.symphony.s2.model.chat.SocialMessage',
                 podId: 1,
@@ -703,15 +680,11 @@ describe('DF2FanoutHandler Tests', () => {
                 body: JSON.stringify(tempBody)
             };
             const records = [ tempRecord ];
-            const result = df2FanoutService.consume(records);
-            result.then(data => {
-                expect(data[ 0 ].messageId).to.eq(tempRecord.messageId);
-                expect(data[ 0 ].isProcessed).to.be.true;
-                done();
-            });
+            const result = await fanoutService.consume(records);
+            expect(result[ 0 ].messageId).to.eq(tempRecord.messageId);
+            expect(result[ 0 ].isProcessed).to.be.true;
         });
-
-        it('Fanout feeds - ok - removing stale feeds', done => {
+        it('Fanout feeds - ok - removing stale feeds', async () => {
             const fetchFeedsResult = {
                 feeds: [
                     {
@@ -742,19 +715,25 @@ describe('DF2FanoutHandler Tests', () => {
                     message: 'ok'
                 }
             ];
-            databaseService.fetchFeeds.resolves(fetchFeedsResult);
-            busService.fanoutMessage.resolves(fanoutFeedsResult);
-            feedService.removeFeeds.resolves(removeFeedsResult);
-            const records = [ record ];
-            const result = df2FanoutService.consume(records);
-            result.then(data => {
-                expect(data[ 0 ].messageId).to.eq(record.messageId);
-                expect(data[ 0 ].isProcessed).to.be.true;
-                done();
+            const busService = {
+                fanoutMessage: sinon.fake.resolves(fanoutFeedsResult),
+                pushBackMessage: sinon.fake.resolves()
+            };
+            const databaseService = {
+                fetchFeeds: sinon.fake.resolves(fetchFeedsResult)
+            };
+            const feedService = {
+                removeFeeds: sinon.fake.resolves(removeFeedsResult)
+            };
+            const fanoutService = new DF2FanoutHandler({
+                logger, busService, databaseService, feedService
             });
+            const records = [ record ];
+            const result = await fanoutService.consume(records);
+            expect(result[ 0 ].messageId).to.eq(record.messageId);
+            expect(result[ 0 ].isProcessed).to.be.true;
         });
-
-        it('Fanout feeds - ok - error in remove stale feeds', done => {
+        it('Fanout feeds - ok - error in remove stale feeds', async () => {
             const fetchFeedsResult = {
                 feeds: [
                     {
@@ -778,19 +757,25 @@ describe('DF2FanoutHandler Tests', () => {
                     message: 'ok'
                 }
             ];
-            databaseService.fetchFeeds.resolves(fetchFeedsResult);
-            busService.fanoutMessage.resolves(fanoutFeedsResult);
-            feedService.removeFeeds.rejects({ code: 'error removing stale feed' });
-            const records = [ record ];
-            const result = df2FanoutService.consume(records);
-            result.then(data => {
-                expect(data[ 0 ].messageId).to.eq(record.messageId);
-                expect(data[ 0 ].isProcessed).to.be.true;
-                done();
+            const busService = {
+                fanoutMessage: sinon.fake.resolves(fanoutFeedsResult),
+                pushBackMessage: sinon.fake.resolves()
+            };
+            const databaseService = {
+                fetchFeeds: sinon.fake.resolves(fetchFeedsResult)
+            };
+            const feedService = {
+                removeFeeds: sinon.fake.rejects('error')
+            };
+            const fanoutService = new DF2FanoutHandler({
+                logger, busService, databaseService, feedService
             });
+            const records = [ record ];
+            const result = await fanoutService.consume(records);
+            expect(result[ 0 ].messageId).to.eq(record.messageId);
+            expect(result[ 0 ].isProcessed).to.be.true;
         });
-
-        it('Fanout feeds - ok - but some queues does not exist yet', done => {
+        it('Fanout feeds - ok - but some queues does not exist yet', async () => {
             const fetchFeedsResult = {
                 feeds: [
                     {
@@ -816,16 +801,23 @@ describe('DF2FanoutHandler Tests', () => {
                     }
                 }
             ];
-            databaseService.fetchFeeds.resolves(fetchFeedsResult);
-            busService.fanoutMessage.resolves(fanoutFeedsResult);
-            feedService.removeFeeds.rejects({ code: 'error removing stale feed' });
-            const records = [ record ];
-            const result = df2FanoutService.consume(records);
-            result.then(data => {
-                expect(data[ 0 ].messageId).to.eq(record.messageId);
-                expect(data[ 0 ].isProcessed).to.be.true;
-                done();
+            const busService = {
+                fanoutMessage: sinon.fake.resolves(fanoutFeedsResult),
+                pushBackMessage: sinon.fake.resolves()
+            };
+            const databaseService = {
+                fetchFeeds: sinon.fake.resolves(fetchFeedsResult)
+            };
+            const feedService = {
+                removeFeeds: sinon.fake.rejects('error')
+            };
+            const fanoutService = new DF2FanoutHandler({
+                logger, busService, databaseService, feedService
             });
+            const records = [ record ];
+            const result = await fanoutService.consume(records);
+            expect(result[ 0 ].messageId).to.eq(record.messageId);
+            expect(result[ 0 ].isProcessed).to.be.true;
         });
     });
 
@@ -864,21 +856,28 @@ describe('DF2FanoutHandler Tests', () => {
             ];
             const removeFeedsResult = [];
 
-            it('Getting payload from s3 and do the fanout - empty payload returned from s3', done => {
-                objectStorageService.getPayload.resolves(Buffer.from(JSON.stringify(payload)).toString('base64'));
-                databaseService.fetchFeeds.resolves(fetchFeedsResult);
-                busService.fanoutMessage.resolves(fanoutFeedsResult);
-                feedService.removeFeeds.resolves(removeFeedsResult);
-                const records = [ record ];
-                const result = df2FanoutService.consume(records);
-                result.then(data => {
-                    expect(data[ 0 ].messageId).to.eq(record.messageId);
-                    expect(data[ 0 ].isProcessed).to.be.true;
-                    done();
+            it('Getting payload from s3 and do the fanout - empty payload returned from s3', async () => {
+                const busService = {
+                    fanoutMessage: sinon.fake.resolves(fanoutFeedsResult),
+                };
+                const databaseService = {
+                    fetchFeeds: sinon.fake.resolves(fetchFeedsResult)
+                };
+                const feedService = {
+                    removeFeeds: sinon.fake.resolves(removeFeedsResult)
+                };
+                const objectStorageService = {
+                    getPayload: sinon.fake.resolves(Buffer.from(JSON.stringify(payload)).toString('base64'))
+                };
+                const fanoutService = new DF2FanoutHandler({
+                    logger, busService, databaseService, feedService, objectStorageService
                 });
+                const records = [ record ];
+                const result = await fanoutService.consume(records);
+                expect(result[ 0 ].messageId).to.eq(record.messageId);
+                expect(result[ 0 ].isProcessed).to.be.true;
             });
         });
-
         describe('No payload and retrieving a large DL in the payload fetched from S3', () => {
             const payload = {
                 payloadType: 'com.symphony.s2.model.chat.SocialMessage',
@@ -913,43 +912,51 @@ describe('DF2FanoutHandler Tests', () => {
             ];
             const removeFeedsResult = [];
 
-            it('cutoff limit not reached - payload should go inside the message', done => {
+            it('cutoff limit not reached - payload should go inside the message', async () => {
                 options.fanout.messaging.vlm.cutoffLimitPubToSqs = 20000;
-                const df2FanoutServiceTemp = new DF2FanoutHandler({
-                    databaseService, busService, objectStorageService, feedService, cacheRepoService: null, options, hostname, logger
+                const busService = {
+                    fanoutMessage: sinon.fake.resolves(fanoutFeedsResult),
+                };
+                const databaseService = {
+                    fetchFeeds: sinon.fake.resolves(fetchFeedsResult)
+                };
+                const feedService = {
+                    removeFeeds: sinon.fake.resolves(removeFeedsResult)
+                };
+                const objectStorageService = {
+                    getPayload: sinon.fake.resolves(Buffer.from(JSON.stringify(payload)).toString('base64'))
+                };
+                const fanoutService = new DF2FanoutHandler({
+                    logger, busService, databaseService, feedService, objectStorageService
                 });
-                objectStorageService.getPayload.resolves(Buffer.from(JSON.stringify(payload)).toString('base64'));
-                databaseService.fetchFeeds.resolves(fetchFeedsResult);
-                busService.fanoutMessage.resolves(fanoutFeedsResult);
-                feedService.removeFeeds.resolves(removeFeedsResult);
                 const records = [ record ];
-                const result = df2FanoutServiceTemp.consume(records);
-                result.then(data => {
-                    expect(data[ 0 ].messageId).to.eq(record.messageId);
-                    expect(data[ 0 ].isProcessed).to.be.true;
-                    done();
-                });
+                const result = await fanoutService.consume(records);
+                expect(result[ 0 ].messageId).to.eq(record.messageId);
+                expect(result[ 0 ].isProcessed).to.be.true;
             });
-
-            it('cutoff limit is reached - payload should not go inside the message', done => {
+            it('cutoff limit is reached - payload should not go inside the message', async () => {
                 options.fanout.messaging.vlm.cutoffLimitPubToSqs = 10;
-                const df2FanoutServiceTemp = new DF2FanoutHandler({
-                    databaseService, busService, objectStorageService, feedService, cacheRepoService: null, options, hostname, logger
+                const busService = {
+                    fanoutMessage: sinon.fake.resolves(fanoutFeedsResult),
+                };
+                const databaseService = {
+                    fetchFeeds: sinon.fake.resolves(fetchFeedsResult)
+                };
+                const feedService = {
+                    removeFeeds: sinon.fake.resolves(removeFeedsResult)
+                };
+                const objectStorageService = {
+                    getPayload: sinon.fake.resolves(Buffer.from(JSON.stringify(payload)).toString('base64'))
+                };
+                const fanoutService = new DF2FanoutHandler({
+                    logger, busService, databaseService, feedService, objectStorageService
                 });
-                objectStorageService.getPayload.resolves(Buffer.from(JSON.stringify(payload)).toString('base64'));
-                databaseService.fetchFeeds.resolves(fetchFeedsResult);
-                busService.fanoutMessage.resolves(fanoutFeedsResult);
-                feedService.removeFeeds.resolves(removeFeedsResult);
                 const records = [ record ];
-                const result = df2FanoutServiceTemp.consume(records);
-                result.then(data => {
-                    expect(data[ 0 ].messageId).to.eq(record.messageId);
-                    expect(data[ 0 ].isProcessed).to.be.true;
-                    done();
-                });
+                const result = await fanoutService.consume(records);
+                expect(result[ 0 ].messageId).to.eq(record.messageId);
+                expect(result[ 0 ].isProcessed).to.be.true;
             });
         });
-
         describe('With payload', () => {
             const payload = {
                 payloadType: 'com.symphony.s2.model.chat.SocialMessage',
@@ -989,72 +996,96 @@ describe('DF2FanoutHandler Tests', () => {
                 }
             ];
             const removeFeedsResult = [];
-
-            it('Getting payload from s3 and do the fanout - valid payload from s3', done => {
-                objectStorageService.getPayload.resolves(Buffer.from(JSON.stringify(payload)).toString('base64'));
-                cacheRepoService.set.resolves({ status: 'fulfilled' });
-                databaseService.fetchFeeds.resolves(fetchFeedsResult);
-                busService.fanoutMessage.resolves(fanoutFeedsResult);
-                feedService.removeFeeds.resolves(removeFeedsResult);
+            it('Getting payload from s3 and do the fanout - valid payload from s3 - cache resolves', async () => {
+                const busService = {
+                    fanoutMessage: sinon.fake.resolves(fanoutFeedsResult),
+                };
+                const databaseService = {
+                    fetchFeeds: sinon.fake.resolves(fetchFeedsResult)
+                };
+                const feedService = {
+                    removeFeeds: sinon.fake.resolves(removeFeedsResult)
+                };
+                const objectStorageService = {
+                    getPayload: sinon.fake.resolves(Buffer.from(JSON.stringify(payload)).toString('base64'))
+                };
+                const cacheRepoService = {
+                    set: sinon.fake.resolves({ status: 'fulfilled' })
+                };
+                const fanoutService = new DF2FanoutHandler({
+                    logger, busService, databaseService, feedService, objectStorageService, cacheRepoService
+                });
                 const records = [ record ];
-                const result = df2FanoutService.consume(records);
-                result.then(data => {
-                    expect(data[ 0 ].messageId).to.eq(record.messageId);
-                    expect(data[ 0 ].isProcessed).to.be.true;
-                    done();
-                });
+                const result = await fanoutService.consume(records);
+                expect(result[ 0 ].messageId).to.eq(record.messageId);
+                expect(result[ 0 ].isProcessed).to.be.true;
             });
-
-            it('Getting payload from s3 and do the fanout - valid payload from s3', done => {
-                objectStorageService.getPayload.resolves(Buffer.from(JSON.stringify(payload)).toString('base64'));
-                cacheRepoService.set.rejects({ status: 'rejected' });
-                databaseService.fetchFeeds.resolves(fetchFeedsResult);
-                busService.fanoutMessage.resolves(fanoutFeedsResult);
-                feedService.removeFeeds.resolves(removeFeedsResult);
+            it('Getting payload from s3 and do the fanout - valid payload from s3 - cache rejects', async () => {
+                const busService = {
+                    fanoutMessage: sinon.fake.resolves(fanoutFeedsResult),
+                };
+                const databaseService = {
+                    fetchFeeds: sinon.fake.resolves(fetchFeedsResult)
+                };
+                const feedService = {
+                    removeFeeds: sinon.fake.resolves(removeFeedsResult)
+                };
+                const objectStorageService = {
+                    getPayload: sinon.fake.resolves(Buffer.from(JSON.stringify(payload)).toString('base64'))
+                };
+                const cacheRepoService = {
+                    set: sinon.fake.rejects('rejected')
+                };
+                const fanoutService = new DF2FanoutHandler({
+                    logger, busService, databaseService, feedService, objectStorageService, cacheRepoService
+                });
                 const records = [ record ];
-                const result = df2FanoutService.consume(records);
-                result.then(data => {
-                    expect(data[ 0 ].messageId).to.eq(record.messageId);
-                    expect(data[ 0 ].isProcessed).to.be.true;
-                    done();
-                });
+                const result = await fanoutService.consume(records);
+                expect(result[ 0 ].messageId).to.eq(record.messageId);
+                expect(result[ 0 ].isProcessed).to.be.true;
             });
-
-            it('Getting payload from s3 and do the fanout - cache repo is null', done => {
-                const df2FanoutServiceTemp = new DF2FanoutHandler({
-                    databaseService, busService, objectStorageService, feedService, cacheRepoService: null, options, hostname, logger
+            it('Getting payload from s3 and do the fanout - cache repo is null', async () => {
+                const busService = {
+                    fanoutMessage: sinon.fake.resolves(fanoutFeedsResult),
+                };
+                const databaseService = {
+                    fetchFeeds: sinon.fake.resolves(fetchFeedsResult)
+                };
+                const feedService = {
+                    removeFeeds: sinon.fake.resolves(removeFeedsResult)
+                };
+                const objectStorageService = {
+                    getPayload: sinon.fake.resolves(Buffer.from(JSON.stringify(payload)).toString('base64'))
+                };
+                const fanoutService = new DF2FanoutHandler({
+                    logger, busService, databaseService, feedService, objectStorageService
                 });
-
-                objectStorageService.getPayload.resolves(Buffer.from(JSON.stringify(payload)).toString('base64'));
-                databaseService.fetchFeeds.resolves(fetchFeedsResult);
-                busService.fanoutMessage.resolves(fanoutFeedsResult);
-                feedService.removeFeeds.resolves(removeFeedsResult);
                 const records = [ record ];
-                const result = df2FanoutServiceTemp.consume(records);
-                result.then(data => {
-                    expect(data[ 0 ].messageId).to.eq(record.messageId);
-                    expect(data[ 0 ].isProcessed).to.be.true;
-                    done();
-                });
+                const result = await fanoutService.consume(records);
+                expect(result[ 0 ].messageId).to.eq(record.messageId);
+                expect(result[ 0 ].isProcessed).to.be.true;
             });
-
-            it('Getting payload from s3 and do the fanout - cutoff limit not reached', done => {
+            it('Getting payload from s3 and do the fanout - cutoff limit not reached', async () => {
                 options.fanout.messaging.vlm.cutoffLimitPubToSqs = 20000;
-                const df2FanoutServiceTemp = new DF2FanoutHandler({
-                    databaseService, busService, objectStorageService, feedService, cacheRepoService: null, options, hostname, logger
+                const busService = {
+                    fanoutMessage: sinon.fake.resolves(fanoutFeedsResult),
+                };
+                const databaseService = {
+                    fetchFeeds: sinon.fake.resolves(fetchFeedsResult)
+                };
+                const feedService = {
+                    removeFeeds: sinon.fake.resolves(removeFeedsResult)
+                };
+                const objectStorageService = {
+                    getPayload: sinon.fake.resolves(Buffer.from(JSON.stringify(payload)).toString('base64'))
+                };
+                const fanoutService = new DF2FanoutHandler({
+                    logger, busService, databaseService, feedService, objectStorageService
                 });
-
-                objectStorageService.getPayload.resolves(Buffer.from(JSON.stringify(payload)).toString('base64'));
-                databaseService.fetchFeeds.resolves(fetchFeedsResult);
-                busService.fanoutMessage.resolves(fanoutFeedsResult);
-                feedService.removeFeeds.resolves(removeFeedsResult);
                 const records = [ record ];
-                const result = df2FanoutServiceTemp.consume(records);
-                result.then(data => {
-                    expect(data[ 0 ].messageId).to.eq(record.messageId);
-                    expect(data[ 0 ].isProcessed).to.be.true;
-                    done();
-                });
+                const result = await fanoutService.consume(records);
+                expect(result[ 0 ].messageId).to.eq(record.messageId);
+                expect(result[ 0 ].isProcessed).to.be.true;
             });
         });
     });
@@ -1078,8 +1109,7 @@ describe('DF2FanoutHandler Tests', () => {
                 SentTimestamp: dateNow - 100,
             }
         };
-
-        it('Should recycling feeds when have feedsItemsToBeDeleted', done => {
+        it('Should recycling feeds when have feedsItemsToBeDeleted', async () => {
             const fetchedFeeds = {
                 feeds: [
                     {
@@ -1092,27 +1122,31 @@ describe('DF2FanoutHandler Tests', () => {
                     }
                 ]
             };
-
             const fanoutFeedsResult = [
                 {
                     status: 'fulfilled',
                     reason: 'ok'
                 }
             ];
-            databaseService.fetchFeeds.resolves(fetchedFeeds);
-            busService.fanoutMessage.resolves(fanoutFeedsResult);
-            feedService.recyclingFeeds.resolves();
-            const records = [ record ];
-            const result = df2FanoutService.consume(records);
-            result.then(data => {
-                expect(data[ 0 ].messageId).to.eq(record.messageId);
-                expect(data[ 0 ].isProcessed).to.be.true;
-                expect(feedService.recyclingFeeds).to.have.been.calledOnce;
-                done();
+            const busService = {
+                fanoutMessage: sinon.fake.resolves(fanoutFeedsResult),
+            };
+            const databaseService = {
+                fetchFeeds: sinon.fake.resolves(fetchedFeeds)
+            };
+            const feedService = {
+                recyclingFeeds: sinon.fake.resolves()
+            };
+            const fanoutService = new DF2FanoutHandler({
+                logger, busService, databaseService, feedService
             });
+            const records = [ record ];
+            const result = await fanoutService.consume(records);
+            expect(result[ 0 ].messageId).to.eq(record.messageId);
+            expect(result[ 0 ].isProcessed).to.be.true;
+            expect(feedService.recyclingFeeds).to.have.been.calledOnce;
         });
-
-        it('Should recycling feeds when have feedsToBeStale', done => {
+        it('Should recycling feeds when have feedsToBeStale', async () => {
             const fetchedFeeds = {
                 feeds: [
                     {
@@ -1125,27 +1159,31 @@ describe('DF2FanoutHandler Tests', () => {
                     }
                 ]
             };
-
             const fanoutFeedsResult = [
                 {
                     status: 'fulfilled',
                     reason: 'ok'
                 }
             ];
-            databaseService.fetchFeeds.resolves(fetchedFeeds);
-            busService.fanoutMessage.resolves(fanoutFeedsResult);
-            feedService.recyclingFeeds.resolves();
-            const records = [ record ];
-            const result = df2FanoutService.consume(records);
-            result.then(data => {
-                expect(data[ 0 ].messageId).to.eq(record.messageId);
-                expect(data[ 0 ].isProcessed).to.be.true;
-                expect(feedService.recyclingFeeds).to.have.been.calledOnce;
-                done();
+            const busService = {
+                fanoutMessage: sinon.fake.resolves(fanoutFeedsResult),
+            };
+            const databaseService = {
+                fetchFeeds: sinon.fake.resolves(fetchedFeeds)
+            };
+            const feedService = {
+                recyclingFeeds: sinon.fake.resolves()
+            };
+            const fanoutService = new DF2FanoutHandler({
+                logger, busService, databaseService, feedService
             });
+            const records = [ record ];
+            const result = await fanoutService.consume(records);
+            expect(result[ 0 ].messageId).to.eq(record.messageId);
+            expect(result[ 0 ].isProcessed).to.be.true;
+            expect(feedService.recyclingFeeds).to.have.been.calledOnce;
         });
-
-        it('Should recycling feeds when have feedsToBeReuse', done => {
+        it('Should recycling feeds when have feedsToBeReuse', async () => {
             const fetchedFeeds = {
                 feeds: [
                     {
@@ -1158,27 +1196,31 @@ describe('DF2FanoutHandler Tests', () => {
                     }
                 ]
             };
-
             const fanoutFeedsResult = [
                 {
                     status: 'fulfilled',
                     reason: 'ok'
                 }
             ];
-            databaseService.fetchFeeds.resolves(fetchedFeeds);
-            busService.fanoutMessage.resolves(fanoutFeedsResult);
-            feedService.recyclingFeeds.resolves();
-            const records = [ record ];
-            const result = df2FanoutService.consume(records);
-            result.then(data => {
-                expect(data[ 0 ].messageId).to.eq(record.messageId);
-                expect(data[ 0 ].isProcessed).to.be.true;
-                expect(feedService.recyclingFeeds).to.have.been.calledOnce;
-                done();
+            const busService = {
+                fanoutMessage: sinon.fake.resolves(fanoutFeedsResult),
+            };
+            const databaseService = {
+                fetchFeeds: sinon.fake.resolves(fetchedFeeds)
+            };
+            const feedService = {
+                recyclingFeeds: sinon.fake.resolves()
+            };
+            const fanoutService = new DF2FanoutHandler({
+                logger, busService, databaseService, feedService
             });
+            const records = [ record ];
+            const result = await fanoutService.consume(records);
+            expect(result[ 0 ].messageId).to.eq(record.messageId);
+            expect(result[ 0 ].isProcessed).to.be.true;
+            expect(feedService.recyclingFeeds).to.have.been.calledOnce;
         });
-
-        it('Should not recycling feeds when doenst have any feed to update the state', done => {
+        it('Should not recycling feeds when doenst have any feed to update the state', async () => {
             const fetchedFeeds = {
                 feeds: [
                     {
@@ -1186,25 +1228,29 @@ describe('DF2FanoutHandler Tests', () => {
                     }
                 ],
             };
-
             const fanoutFeedsResult = [
                 {
                     status: 'fulfilled',
                     reason: 'ok'
                 }
             ];
-            databaseService.fetchFeeds.resolves(fetchedFeeds);
-            busService.fanoutMessage.resolves(fanoutFeedsResult);
-            feedService.recyclingFeeds.resolves();
-            const records = [ record ];
-            const result = df2FanoutService.consume(records);
-            result.then(data => {
-                expect(data[ 0 ].messageId).to.eq(record.messageId);
-                expect(data[ 0 ].isProcessed).to.be.true;
-                expect(feedService.recyclingFeeds).to.have.not.been.calledOnce;
-                done();
+            const busService = {
+                fanoutMessage: sinon.fake.resolves(fanoutFeedsResult),
+            };
+            const databaseService = {
+                fetchFeeds: sinon.fake.resolves(fetchedFeeds)
+            };
+            const feedService = {
+                recyclingFeeds: sinon.fake.resolves()
+            };
+            const fanoutService = new DF2FanoutHandler({
+                logger, busService, databaseService, feedService
             });
+            const records = [ record ];
+            const result = await fanoutService.consume(records);
+            expect(result[ 0 ].messageId).to.eq(record.messageId);
+            expect(result[ 0 ].isProcessed).to.be.true;
+            expect(feedService.recyclingFeeds).to.have.not.been.calledOnce;
         });
-
     });
 });
