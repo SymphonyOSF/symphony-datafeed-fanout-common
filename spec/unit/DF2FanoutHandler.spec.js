@@ -1337,9 +1337,10 @@ describe('DF2FanoutHandler Tests', () => {
 
         it('should NOT log as warn "on-time" messages of any type', () => {
             const fanoutService = new DF2FanoutHandler(fanoutServiceParams);
-            const payloadType = DF2Constants.EventType.C_SOCIAL_MESSAGE;
-            const shouldLog = fanoutService.shouldLogDelayedMessagesAsWarn(payloadType, hops);
-            expect(shouldLog).to.be.false;
+            Object.keys(DF2Constants.EventType).forEach(payloadType => {
+                const shouldLog = fanoutService.shouldLogDelayedMessagesAsWarn(payloadType, hops);
+                expect(shouldLog).to.be.false;
+            });
         });
     });
 });
