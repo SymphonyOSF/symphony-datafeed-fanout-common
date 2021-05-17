@@ -386,13 +386,19 @@ export default class DF2FanoutHandler {
     }
 
     /**
-     * Evaluates whether a message should be logged as warn based on payload type and hops latencies.
+     * Evaluates whether a message should be logged as warn based on payload
+     * type and hops latencies.
      *
      * @param payloadType as defined in {@link DF2Constants#EventType}
      * @param metricsHops as defined in {@link Metrics#hops}
      * @return true if message should be logged as warn, false otherwise.
      */
     shouldLogDelayedMessagesAsWarn(payloadType, metricsHops) {
+        if (payloadType !== DF2Constants.EventType.C_OBJECT_STATUS
+          && payloadType !== DF2Constants.EventType.C_SOCIAL_MESSAGE) {
+            return false;
+        }
+
         const {
             sbeToS2FwdElapsedTime,
             s2FwdToSentToSqsElapsedTime,
@@ -400,13 +406,10 @@ export default class DF2FanoutHandler {
             df2FanoutInternalProcessingTime
         } = metricsHops;
 
-        let shouldLog = payloadType === DF2Constants.EventType.C_OBJECT_STATUS
-            || payloadType === DF2Constants.EventType.C_SOCIAL_MESSAGE;
-
-        shouldLog = shouldLog && df2FanoutInternalProcessingTime > this.delayedMessageThresholdsMs.df2FanoutInternalProcessingTime;
-        shouldLog = shouldLog && sbeToS2FwdElapsedTime > this.delayedMessageThresholdsMs.sbeToS2FwdElapsedTime;
-        shouldLog = shouldLog && s2FwdToSentToSqsElapsedTime > this.delayedMessageThresholdsMs.s2FwdToSentToSqsElapsedTime;
-        shouldLog = shouldLog && sentToSqsToRcvByDf2FanoutElapsedTime > this.delayedMessageThresholdsMs.sentToSqsToRcvByDf2FanoutElapsedTime;
+        let shouldLog = df2FanoutInternalProcessingTime > this.delayedMessageThresholdsMs.df2FanoutInternalProcessingTime;
+        shouldLog = shouldLog || sbeToS2FwdElapsedTime > this.delayedMessageThresholdsMs.sbeToS2FwdElapsedTime;
+        shouldLog = shouldLog || s2FwdToSentToSqsElapsedTime > this.delayedMessageThresholdsMs.s2FwdToSentToSqsElapsedTime;
+        shouldLog = shouldLog || sentToSqsToRcvByDf2FanoutElapsedTime > this.delayedMessageThresholdsMs.sentToSqsToRcvByDf2FanoutElapsedTime;
 
         return shouldLog;
     }
