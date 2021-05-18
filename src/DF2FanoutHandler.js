@@ -30,6 +30,7 @@ export default class DF2FanoutHandler {
         this.lastMessageProcessedTimestamp = 0;
         this.hostname = hostname;
 
+        this.delayedMessageThresholdsMs = _.get(options, 'logger.delayedMessageThresholdsMs');
         this.isMetricsExportationActivated = _.get(options, 'telemetry.isExportationActivated');
         this.logger = logger;
     }
@@ -384,6 +385,35 @@ export default class DF2FanoutHandler {
                 && payloadType !== DF2Constants.EventType.C_TYPING_NOTIFICATION_TYPE;
     }
 
+    /**
+     * Evaluates whether a message should be logged as warn based on payload
+     * type and hops latencies.
+     *
+     * @param payloadType as defined in {@link DF2Constants#EventType}
+     * @param metricsHops as defined in {@link Metrics#hops}
+     * @return true if message should be logged as warn, false otherwise.
+     */
+    shouldLogDelayedMessagesAsWarn(payloadType, metricsHops) {
+        if (payloadType !== DF2Constants.EventType.C_OBJECT_STATUS
+          && payloadType !== DF2Constants.EventType.C_SOCIAL_MESSAGE) {
+            return false;
+        }
+
+        const {
+            sbeToS2FwdElapsedTime,
+            s2FwdToSentToSqsElapsedTime,
+            sentToSqsToRcvByDf2FanoutElapsedTime,
+            df2FanoutInternalProcessingTime
+        } = metricsHops;
+
+        let shouldLog = df2FanoutInternalProcessingTime > this.delayedMessageThresholdsMs.df2FanoutInternalProcessingTime;
+        shouldLog = shouldLog || sbeToS2FwdElapsedTime > this.delayedMessageThresholdsMs.sbeToS2FwdElapsedTime;
+        shouldLog = shouldLog || s2FwdToSentToSqsElapsedTime > this.delayedMessageThresholdsMs.s2FwdToSentToSqsElapsedTime;
+        shouldLog = shouldLog || sentToSqsToRcvByDf2FanoutElapsedTime > this.delayedMessageThresholdsMs.sentToSqsToRcvByDf2FanoutElapsedTime;
+
+        return shouldLog;
+    }
+
     async processRecord(record, telemetry, isProcessedByEcs = false) {
         /**
          * metrics will contain all measures computed for the current record under processing
@@ -429,6 +459,13 @@ export default class DF2FanoutHandler {
 
             if (this.isNeitherTypingOrPresence(payloadType)) {
                 this.logger.info('type[audit] received messageId[%s] from MF', _.get(message, 'data.payload.payload.messageId'));
+            }
+
+            const metricsHops = metrics.getMetrics().hops;
+            if (this.shouldLogDelayedMessagesAsWarn(payloadType, metricsHops)) {
+                const messageId = _.get(message, 'data.payload.payload.messageId');
+                this.logger.warn('type[audit] received delayed message from MF: messageId=[%s], hopsLatencies=[%o]',
+                    messageId, metricsHops);
             }
 
             telemetry.setPodId(podId);
