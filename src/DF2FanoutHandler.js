@@ -1,10 +1,5 @@
-import _get from 'lodash/get';
-import _isUndefined from 'lodash/isUndefined';
-import _chunk from 'lodash/chunk';
-import _isEmpty from 'lodash/isEmpty';
-import DF2Constants from 'symphony-datafeed-core/DF2Constants';
-import generateVLMCacheKeyPrefix from 'symphony-datafeed-core/generateVLMCacheKeyPrefix';
-import generateCacheKeysToReplicate from 'symphony-datafeed-core/generateCacheKeysToReplicate';
+import _ from 'lodash';
+import { DF2Constants, generateVLMCacheKeyPrefix, generateCacheKeysToReplicate } from 'symphony-datafeed-core';
 
 import validatePayloadType from './checkers/PayloadValidator';
 import PipelineError from './exceptions/PipelineError';
@@ -12,7 +7,7 @@ import Telemetry from './telemetry/Telemetry';
 import Metrics from './telemetry/Metrics';
 import MetricsConstants from './telemetry/MetricsConstants';
 
-class DF2FanoutHandler {
+export default class DF2FanoutHandler {
 
     constructor({
         databaseService, busService, objectStorageService, feedService, cacheRepoService, logger, options, hostname
@@ -23,19 +18,20 @@ class DF2FanoutHandler {
         this.feedService = feedService;
         this.cacheRepoService = cacheRepoService;
 
-        this.environment = _get(options, 'environment');
-        this.startSplitFromRoomSize = _get(options, 'fanout.splitting.startSplitFromRoomSize');
-        this.dlSizeOfSplitMsg = _get(options, 'fanout.splitting.distributionListSizeOfSplitMsg');
-        this.cutoffLimitPubToSqs = _get(options, 'fanout.messaging.vlm.cutoffLimitPubToSqs');
-        this.staleFeedsTtl = _get(options, 'staleFeedsTtl');
-        this.itemExpirationTimeInSec = _get(options, 'cache.itemExpirationTimeInSec');
+        this.environment = _.get(options, 'environment');
+        this.startSplitFromRoomSize = _.get(options, 'fanout.splitting.startSplitFromRoomSize');
+        this.dlSizeOfSplitMsg = _.get(options, 'fanout.splitting.distributionListSizeOfSplitMsg');
+        this.cutoffLimitPubToSqs = _.get(options, 'fanout.messaging.vlm.cutoffLimitPubToSqs');
+        this.staleFeedsTtl = _.get(options, 'staleFeedsTtl');
+        this.itemExpirationTimeInSec = _.get(options, 'cache.itemExpirationTimeInSec');
 
-        this.cacheType = _get(options, 'cache.type');
+        this.cacheType = _.get(options, 'cache.type');
 
         this.lastMessageProcessedTimestamp = 0;
         this.hostname = hostname;
 
-        this.isMetricsExportationActivated = _get(options, 'telemetry.isExportationActivated');
+        this.delayedMessageThresholdsMs = _.get(options, 'logger.delayedMessageThresholdsMs');
+        this.isMetricsExportationActivated = _.get(options, 'telemetry.isExportationActivated');
         this.logger = logger;
     }
 
@@ -112,14 +108,14 @@ class DF2FanoutHandler {
     validateMessage(message) {
         this.logger.debug('id[%s] - STEP::Content validation', message.id);
 
-        const payloadType = _get(message, 'data.payload.payloadType');
-        if (_isUndefined(payloadType)) {
+        const payloadType = _.get(message, 'data.payload.payloadType');
+        if (_.isUndefined(payloadType)) {
             this.logger.info('id[%s] - STEP::Content validation - missing payloadType. Message = %o', message.id, message);
             throw new PipelineError({ message: `id[${message.id}] -  STEP::Content validation - Missing payloadType`, discardOriginalMessage: true });
         }
 
-        const podId = _get(message, 'data.payload.podId');
-        if (_isUndefined(podId)) {
+        const podId = _.get(message, 'data.payload.podId');
+        if (_.isUndefined(podId)) {
             this.logger.info('id[%s] - STEP::Content validation - missing podId. Message = %o', message.id, message);
             throw new PipelineError({ message: `id[${message.id}] -  STEP::Content validation - Missing podId`, discardOriginalMessage: true });
         }
@@ -140,7 +136,7 @@ class DF2FanoutHandler {
     }
 
     isMessageExpired(message) {
-        const expirationDate = _get(message, 'data.payload.expirationDate');
+        const expirationDate = _.get(message, 'data.payload.expirationDate');
         if (expirationDate) {
             const convertedExpirationDate = new Date(expirationDate).getTime();
             if (convertedExpirationDate <= Date.now()) {
@@ -200,8 +196,8 @@ class DF2FanoutHandler {
                     const keys = generateCacheKeysToReplicate(keyPrefix);
                     const promises = [];
                     this.logger.debug('Received a VLM and storing its payload at key [%s]', keyPrefix);
-                    const internalPayload = _get(message, 'data.payload.payload');
-                    if (!_isEmpty(internalPayload)) {
+                    const internalPayload = _.get(message, 'data.payload.payload');
+                    if (!_.isEmpty(internalPayload)) {
                         const d1cache = Date.now();
                         const internalPayloadString = JSON.stringify(internalPayload);
                         for (let i = 0; i < keys.length; i++) {
@@ -264,7 +260,7 @@ class DF2FanoutHandler {
     checkSplit(id, messageData, distributionList) {
         const isSplittable = this.isMessageSplittable(distributionList);
         if (isSplittable) {
-            const copies = _chunk(distributionList, this.dlSizeOfSplitMsg);
+            const copies = _.chunk(distributionList, this.dlSizeOfSplitMsg);
             if (copies.length > 1) {
                 return {
                     split: true,
@@ -311,9 +307,9 @@ class DF2FanoutHandler {
         this.logger.debug('id[%s] - STEP::broadcast', message.id);
 
         try {
-            const isBroadcast = _get(message, 'data.payload.broadcast') === 'ALL';
+            const isBroadcast = _.get(message, 'data.payload.broadcast') === 'ALL';
             if (isBroadcast) {
-                this.logger.info('type[audit] broadcast messageId[%s]', _get(message.data, 'data.payload.payload.messageId'));
+                this.logger.info('type[audit] broadcast messageId[%s]', _.get(message.data, 'data.payload.payload.messageId'));
                 await this.busService.broadcastMessage(message.data, podId);
             }
             return isBroadcast;
@@ -331,7 +327,6 @@ class DF2FanoutHandler {
 
     adaptMessage(message, isFromEcs) {
         const { messageId, body, attributes } = message;
-
         if ((!messageId || !body) && !isFromEcs) {
             throw new PipelineError({ message: 'Missing params in the message', discardOriginalMessage: true });
         }
@@ -366,9 +361,9 @@ class DF2FanoutHandler {
     }
 
     calculateExternalHops(message, telemetry, metrics) {
-        const createdDate = Date.parse(_get(message, 'data.payload.createdDate'));
-        const notificationDate = Date.parse(_get(message, 'data.payload.notificationDate'));
-        const sentToSQS = parseInt(_get(message, 'attributes.SentTimestamp'), 10);
+        const createdDate = Date.parse(_.get(message, 'data.payload.createdDate'));
+        const notificationDate = Date.parse(_.get(message, 'data.payload.notificationDate'));
+        const sentToSQS = parseInt(_.get(message, 'attributes.SentTimestamp'), 10);
         const rcvByTheService = telemetry.getTelemetryCreatedDate();
         const isValidMsgForwarderMessage = createdDate > 0 && notificationDate;
 
@@ -390,6 +385,35 @@ class DF2FanoutHandler {
                 && payloadType !== DF2Constants.EventType.C_TYPING_NOTIFICATION_TYPE;
     }
 
+    /**
+     * Evaluates whether a message should be logged as warn based on payload
+     * type and hops latencies.
+     *
+     * @param payloadType as defined in {@link DF2Constants#EventType}
+     * @param metricsHops as defined in {@link Metrics#hops}
+     * @return true if message should be logged as warn, false otherwise.
+     */
+    shouldLogDelayedMessagesAsWarn(payloadType, metricsHops) {
+        if (payloadType !== DF2Constants.EventType.C_OBJECT_STATUS
+          && payloadType !== DF2Constants.EventType.C_SOCIAL_MESSAGE) {
+            return false;
+        }
+
+        const {
+            sbeToS2FwdElapsedTime,
+            s2FwdToSentToSqsElapsedTime,
+            sentToSqsToRcvByDf2FanoutElapsedTime,
+            df2FanoutInternalProcessingTime
+        } = metricsHops;
+
+        let shouldLog = df2FanoutInternalProcessingTime > this.delayedMessageThresholdsMs.df2FanoutInternalProcessingTime;
+        shouldLog = shouldLog || sbeToS2FwdElapsedTime > this.delayedMessageThresholdsMs.sbeToS2FwdElapsedTime;
+        shouldLog = shouldLog || s2FwdToSentToSqsElapsedTime > this.delayedMessageThresholdsMs.s2FwdToSentToSqsElapsedTime;
+        shouldLog = shouldLog || sentToSqsToRcvByDf2FanoutElapsedTime > this.delayedMessageThresholdsMs.sentToSqsToRcvByDf2FanoutElapsedTime;
+
+        return shouldLog;
+    }
+
     async processRecord(record, telemetry, isProcessedByEcs = false) {
         /**
          * metrics will contain all measures computed for the current record under processing
@@ -404,7 +428,6 @@ class DF2FanoutHandler {
             metrics.setInterArrivalTime(this.lastMessageProcessedTimestamp);
         }
         this.lastMessageProcessedTimestamp = metrics.getMetricsCreatedDate();
-
         const message = this.adaptMessage(record, isProcessedByEcs);
 
         try {
@@ -435,7 +458,14 @@ class DF2FanoutHandler {
             metrics.calculateInternalLatencyForValidate(Date.now() - validateD0);
 
             if (this.isNeitherTypingOrPresence(payloadType)) {
-                this.logger.info('type[audit] received messageId[%s] from MF', _get(message, 'data.payload.payload.messageId'));
+                this.logger.info('type[audit] received messageId[%s] from MF', _.get(message, 'data.payload.payload.messageId'));
+            }
+
+            const metricsHops = metrics.getMetrics().hops;
+            if (this.shouldLogDelayedMessagesAsWarn(payloadType, metricsHops)) {
+                const messageId = _.get(message, 'data.payload.payload.messageId');
+                this.logger.warn('type[audit] received delayed message from MF: messageId=[%s], hopsLatencies=[%o]',
+                    messageId, metricsHops);
             }
 
             telemetry.setPodId(podId);
@@ -456,7 +486,7 @@ class DF2FanoutHandler {
 
                 if (isAllowedMessage) {
 
-                    const distributionList = _get(message, 'data.payload.distributionList', []);
+                    const distributionList = _.get(message, 'data.payload.distributionList', []);
 
                     if (isVLM) {
                         metrics.setLatencyToGetPayloadFromS3(latencyToGetPayloadFromS3);
@@ -505,7 +535,7 @@ class DF2FanoutHandler {
                             fanoutResults.forEach(fanoutResult => {
                                 const isRejected = fanoutResult.status === 'rejected';
                                 if (isRejected) {
-                                    const rejectReason = _get(fanoutResult, 'reason.message', '');
+                                    const rejectReason = _.get(fanoutResult, 'reason.message', '');
                                     const isNonExistentQueueReason = rejectReason === DF2Constants.Errors.ERROR_NONEXISTENT_QUEUE;
                                     if (isNonExistentQueueReason) {
                                         this.logger.debug('id[%s] - STEP::Fanout: nonexistent queue, but fanout proceeds normally, podId: %d', message.id, podId);
@@ -516,13 +546,13 @@ class DF2FanoutHandler {
                                 }
                             });
                             if (this.isNeitherTypingOrPresence(payloadType)) {
-                                this.logger.info('type[audit] fanout done for messageId[%s]', _get(message, 'data.payload.payload.messageId'));
+                                this.logger.info('type[audit] fanout done for messageId[%s]', _.get(message, 'data.payload.payload.messageId'));
                             }
                             const d2Fanout = Date.now();
                             metrics.calculateInternalLatencyForFanout(d2Fanout - d1Fanout);
                             this.logger.debug('id[%s] - STEP::fanout - DONE - latency[%d]ms', message.id, d2Fanout - d1Fanout);
 
-                            const hasFeedsToRecycle = !_isEmpty(feedsItemsToBeDeleted) || !_isEmpty(feedsToBeStale) || !_isEmpty(feedsToBeReuse);
+                            const hasFeedsToRecycle = !_.isEmpty(feedsItemsToBeDeleted) || !_.isEmpty(feedsToBeStale) || !_.isEmpty(feedsToBeReuse);
                             if (hasFeedsToRecycle) {
                                 const df1Recycling = Date.now();
                                 this.logger.debug('id[%s] - STEP:: recycling feeds INIT', message.id);
@@ -541,7 +571,7 @@ class DF2FanoutHandler {
         } catch (errorInMainPipeline) {
             if (!errorInMainPipeline.discardOriginalMessage) {
                 try {
-                    const currentFailCounter = _get(message, 'data.retries', 0);
+                    const currentFailCounter = _.get(message, 'data.retries', 0);
                     message.data.retries = currentFailCounter + 1;
                     if (!message.data.originalMessageId) {
                         // add the original message id here to keep message tracking in the logs
@@ -606,11 +636,9 @@ class DF2FanoutHandler {
         }
         try {
             const recordsResult = await Promise.all(promises);
+            return recordsResult;
+        } finally {
             await this.closeTelemetry(telemetry);
-            return Promise.resolve(recordsResult);
-        } catch (recordsConsumptionException) {
-            await this.closeTelemetry(telemetry);
-            return Promise.reject(recordsConsumptionException);
         }
     }
 
@@ -618,14 +646,10 @@ class DF2FanoutHandler {
         const telemetry = new Telemetry(this.environment, this.hostname);
         try {
             await this.processRecord(message, telemetry, true);
+            return 'fanout';
+        } finally {
             await this.closeTelemetry(telemetry);
-            return Promise.resolve('fanout');
-        } catch (err) {
-            await this.closeTelemetry(telemetry);
-            return Promise.reject(err);
         }
     }
 
 }
-
-module.exports = DF2FanoutHandler;
