@@ -1,5 +1,6 @@
-import { findFeeds } from 'symphony-datafeed-core';
+import { feeds as coreFeeds } from 'symphony-datafeed-core';
 
+const { findFeedsByMessage } = coreFeeds;
 export default class DatabaseService {
 
     constructor({
@@ -11,13 +12,12 @@ export default class DatabaseService {
         this.staleFeedsTtl = staleFeedsTtl;
     }
 
-    fetchFeeds(message, listOfIds) {
-        return findFeeds({
+    fetchFeeds(message) {
+        return findFeedsByMessage({
             daxClient: this.daxClient,
             directClient: this.directClient,
             tableName: this.tableName,
             staleFeedsTtl: this.staleFeedsTtl,
-            ids: listOfIds,
             message
         });
     }

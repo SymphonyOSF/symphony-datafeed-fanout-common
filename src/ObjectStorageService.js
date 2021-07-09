@@ -1,5 +1,6 @@
-import { s3GetObject } from 'symphony-datafeed-core';
+import { feeds as coreFeeds } from 'symphony-datafeed-core';
 
+const { getIngestedMessageFromStorage } = coreFeeds.consumers;
 export default class ObjectStorageService {
 
     constructor(s3Client) {
@@ -8,10 +9,14 @@ export default class ObjectStorageService {
 
     getPayload(data) {
         const {
-            s3BucketName,
-            s3Key
+            s3BucketName: bucket,
+            s3Key: key
         } = data;
-        return s3GetObject(this.s3Client, s3BucketName, s3Key);
+        return getIngestedMessageFromStorage({
+            s3Client: this.s3Client,
+            bucket,
+            key
+        });
     }
 
 }

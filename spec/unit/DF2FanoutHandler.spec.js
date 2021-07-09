@@ -2,11 +2,8 @@
 /* eslint-disable no-unused-expressions */
 /* eslint-disable no-undef */
 import { describe } from 'mocha';
-import chai, { expect } from 'chai';
+import { expect } from 'chai';
 import sinon from 'sinon';
-import sinonChai from 'sinon-chai';
-
-chai.use(sinonChai);
 
 import { DF2Constants } from 'symphony-datafeed-core';
 
@@ -437,7 +434,7 @@ describe('DF2FanoutHandler Tests', () => {
         };
         it('Fanout feeds is returning only one promise rejected', async () => {
             const fetchFeedsResult = {
-                feeds: [
+                active: [
                     {
                         feedId: '1'
                     },
@@ -445,7 +442,7 @@ describe('DF2FanoutHandler Tests', () => {
                         feedId: '2'
                     }
                 ],
-                feedsItemsToBeDeleted: []
+                toDelete: []
             };
             const fanoutFeedsResult = [
                 {
@@ -472,7 +469,7 @@ describe('DF2FanoutHandler Tests', () => {
         });
         it('Fanout feeds - ok', async () => {
             const fetchFeedsResult = {
-                feeds: [
+                active: [
                     {
                         feedId: '1',
                     },
@@ -480,7 +477,7 @@ describe('DF2FanoutHandler Tests', () => {
                         feedId: '2',
                     }
                 ],
-                feedsItemsToBeDeleted: [
+                toDelete: [
                     {
                         feedId: '3',
                     },
@@ -520,7 +517,7 @@ describe('DF2FanoutHandler Tests', () => {
         });
         it('Fanout feeds - ok - telemetry exportation failing', async () => {
             const fetchFeedsResult = {
-                feeds: [
+                active: [
                     {
                         feedId: '1'
                     },
@@ -528,7 +525,7 @@ describe('DF2FanoutHandler Tests', () => {
                         feedId: '2'
                     }
                 ],
-                feedsItemsToBeDeleted: []
+                toDelete: []
             };
             const fanoutFeedsResult = [
                 {
@@ -561,7 +558,7 @@ describe('DF2FanoutHandler Tests', () => {
         });
         it('Fanout feeds - ok - more than one record', async () => {
             const fetchFeedsResult = {
-                feeds: [
+                active: [
                     {
                         feedId: '1'
                     },
@@ -569,7 +566,7 @@ describe('DF2FanoutHandler Tests', () => {
                         feedId: '2'
                     }
                 ],
-                feedsItemsToBeDeleted: []
+                toDelete: []
             };
             const fanoutFeedsResult = [
                 {
@@ -622,7 +619,7 @@ describe('DF2FanoutHandler Tests', () => {
             };
 
             const fetchFeedsResult = {
-                feeds: [
+                active: [
                     {
                         feedId: '1'
                     },
@@ -630,7 +627,7 @@ describe('DF2FanoutHandler Tests', () => {
                         feedId: '2'
                     }
                 ],
-                feedsItemsToBeDeleted: []
+                toDelete: []
             };
             const fanoutFeedsResult = [
                 {
@@ -687,7 +684,7 @@ describe('DF2FanoutHandler Tests', () => {
         });
         it('Fanout feeds - ok - removing stale feeds', async () => {
             const fetchFeedsResult = {
-                feeds: [
+                active: [
                     {
                         feedId: '1'
                     },
@@ -695,7 +692,7 @@ describe('DF2FanoutHandler Tests', () => {
                         feedId: '2'
                     }
                 ],
-                feedsItemsToBeDeleted: [
+                toDelete: [
                     'one'
                 ]
             };
@@ -736,7 +733,7 @@ describe('DF2FanoutHandler Tests', () => {
         });
         it('Fanout feeds - ok - error in remove stale feeds', async () => {
             const fetchFeedsResult = {
-                feeds: [
+                active: [
                     {
                         feedId: '1'
                     },
@@ -744,7 +741,7 @@ describe('DF2FanoutHandler Tests', () => {
                         feedId: '2'
                     }
                 ],
-                feedsItemsToBeDeleted: [
+                toDelete: [
                     'one'
                 ]
             };
@@ -778,7 +775,7 @@ describe('DF2FanoutHandler Tests', () => {
         });
         it('Fanout feeds - ok - but some queues does not exist yet', async () => {
             const fetchFeedsResult = {
-                feeds: [
+                active: [
                     {
                         feedId: '1'
                     },
@@ -786,7 +783,7 @@ describe('DF2FanoutHandler Tests', () => {
                         feedId: '2'
                     }
                 ],
-                feedsItemsToBeDeleted: [
+                toDelete: [
                     'one'
                 ]
             };
@@ -835,7 +832,7 @@ describe('DF2FanoutHandler Tests', () => {
                 body: JSON.stringify(body)
             };
             const fetchFeedsResult = {
-                feeds: [
+                active: [
                     {
                         feedId: '1'
                     },
@@ -843,7 +840,7 @@ describe('DF2FanoutHandler Tests', () => {
                         feedId: '2'
                     }
                 ],
-                feedsItemsToBeDeleted: []
+                toDelete: []
             };
             const fanoutFeedsResult = [
                 {
@@ -892,7 +889,7 @@ describe('DF2FanoutHandler Tests', () => {
                 body: JSON.stringify(body)
             };
             const fetchFeedsResult = {
-                feeds: [
+                active: [
                     {
                         feedId: '1'
                     },
@@ -900,7 +897,7 @@ describe('DF2FanoutHandler Tests', () => {
                         feedId: '2'
                     }
                 ],
-                feedsItemsToBeDeleted: []
+                toDelete: []
             };
             const fanoutFeedsResult = [
                 {
@@ -979,7 +976,7 @@ describe('DF2FanoutHandler Tests', () => {
                 body: JSON.stringify(body)
             };
             const fetchFeedsResult = {
-                feeds: [
+                active: [
                     {
                         feedId: '1'
                     },
@@ -987,7 +984,7 @@ describe('DF2FanoutHandler Tests', () => {
                         feedId: '2'
                     }
                 ],
-                feedsItemsToBeDeleted: []
+                toDelete: []
             };
             const fanoutFeedsResult = [
                 {
@@ -1117,14 +1114,14 @@ describe('DF2FanoutHandler Tests', () => {
                 SentTimestamp: dateNow - 100,
             }
         };
-        it('Should recycling feeds when have feedsItemsToBeDeleted', async () => {
+        it('Should recycling feeds when have toDelete', async () => {
             const fetchedFeeds = {
-                feeds: [
+                active: [
                     {
                         feedId: 1
                     }
                 ],
-                feedsItemsToBeDeleted: [
+                toDelete: [
                     {
                         feedId: 2
                     }
@@ -1156,12 +1153,12 @@ describe('DF2FanoutHandler Tests', () => {
         });
         it('Should recycling feeds when have feedsToBeStale', async () => {
             const fetchedFeeds = {
-                feeds: [
+                active: [
                     {
                         feedId: 1
                     }
                 ],
-                feedsToBeStale: [
+                toStale: [
                     {
                         feedId: 2
                     }
@@ -1193,12 +1190,12 @@ describe('DF2FanoutHandler Tests', () => {
         });
         it('Should recycling feeds when have feedsToBeReuse', async () => {
             const fetchedFeeds = {
-                feeds: [
+                active: [
                     {
                         feedId: 1
                     }
                 ],
-                feedsToBeReuse: [
+                toReuse: [
                     {
                         feedId: 2
                     }
@@ -1230,7 +1227,7 @@ describe('DF2FanoutHandler Tests', () => {
         });
         it('Should not recycling feeds when doenst have any feed to update the state', async () => {
             const fetchedFeeds = {
-                feeds: [
+                active: [
                     {
                         feedId: 1
                     }
@@ -1311,19 +1308,19 @@ describe('DF2FanoutHandler Tests', () => {
         it('should log as warn delayed Social or ObjectStatus messages', () => {
             const fanoutService = new DF2FanoutHandler(fanoutServiceParams);
 
-            let payloadType = DF2Constants.EventType.C_SOCIAL_MESSAGE;
+            let payloadType = DF2Constants.EventType.SOCIAL_MESSAGE;
             testAllPossibleDelays(fanoutService, payloadType);
 
-            payloadType = DF2Constants.EventType.C_OBJECT_STATUS;
+            payloadType = DF2Constants.EventType.OBJECT_STATUS;
             testAllPossibleDelays(fanoutService, payloadType);
         });
 
         it('should NOT log as warn delayed messages of types other than Social/ObjectStatus', () => {
             const payloadTypes = [
-                DF2Constants.EventType.C_RBC_TYPE,
-                DF2Constants.EventType.C_PRESENCE_TYPE,
-                DF2Constants.EventType.C_TYPING_NOTIFICATION_TYPE,
-                DF2Constants.EventType.C_SIGNAL_NOTIFICATION_TYPE
+                DF2Constants.EventType.REMOVE_BADGE_COUNT,
+                DF2Constants.EventType.PRESENCE_CHANGE,
+                DF2Constants.EventType.TYPING_NOTIFICATION,
+                DF2Constants.EventType.SIGNAL_NOTIFICATION
             ];
 
             const delayedHops = getDelayedHops('s2FwdToSentToSqsElapsedTime');

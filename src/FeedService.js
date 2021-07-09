@@ -1,8 +1,7 @@
-/* eslint-disable consistent-return */
-/* eslint-disable no-restricted-syntax */
-/* eslint-disable no-await-in-loop */
 import _ from 'lodash';
-import { markFeedStale, removeFeeds } from 'symphony-datafeed-core';
+import { feeds as coreFeeds } from 'symphony-datafeed-core';
+
+const { removeFeeds, markFeedStale } = coreFeeds;
 
 export default class FeedService {
 
@@ -74,7 +73,7 @@ export default class FeedService {
                         directClient: this.ddbDirectClient,
                         tableName: this.tableName,
                         feedsKey,
-                        feedId
+                        feed
                     });
                     result.numFeedUpdatedToStale++;
                 } catch (error) {
@@ -113,7 +112,7 @@ export default class FeedService {
         const promises = [];
         promises.push(this.updateFeedsToStale(feedsToStale, podId));
         promises.push(this.updateFeedsToReuse(feedsToReuse, podId));
-        promises.push(this.removeFeeds(feedsToRemove, podId));
+        promises.push(this.removeFeeds(feedsToRemove, podId)); // legacy
 
         return Promise.allSettled(promises);
     }
