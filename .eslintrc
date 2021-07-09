@@ -1,5 +1,8 @@
 {
-  "parser": "babel-eslint",
+  "parser": "@babel/eslint-parser",
+  "parserOptions": {
+    "requireConfigFile": false
+  },
   "extends": [
     "airbnb-base/legacy"
   ],
@@ -13,7 +16,7 @@
       "single",
       "avoid-escape"
     ],
-    "comma-dangle": 0,
+    "comma-dangle": "off",
     "no-use-before-define": [
       "error",
       {
@@ -36,13 +39,13 @@
       "error",
       "always"
     ],
-    "no-prototype-builtins": 0,
+    "no-prototype-builtins": "off",
     "eqeqeq": [
       "error",
       "always"
     ],
-    "no-plusplus": 0,
-    "no-underscore-dangle": 0,
+    "no-plusplus": "off",
+    "no-underscore-dangle": "off",
     "no-param-reassign": [
       "error",
       {
@@ -61,11 +64,27 @@
         "ignoreArrayIndexes": true
       }
     ],
-    "class-methods-use-this": 0,
-    "max-len": 0
+    "class-methods-use-this": "off",
+    "max-len": "off",
+    "no-unused-vars": [
+      "error",
+      {
+        "varsIgnorePattern": "^_",
+        "argsIgnorePattern": "^_"
+      }
+    ],
+    "no-unused-expressions": "off",
+    "no-restricted-syntax": "off",
+    "no-return-assign": "off",
+    "consistent-return": "off",
+    "no-empty": "off",
+    "default-case": "off",
+    "no-await-in-loop": "off",
+    "func-names": "off"
   },
   "env": {
     "node": true,
-    "es6": true
+    "es6": true,
+    "mocha": true
   }
 }

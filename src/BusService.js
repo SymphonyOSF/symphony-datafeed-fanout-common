@@ -1,59 +1,73 @@
-import _ from 'lodash';
 import {
-    broadcast, fanout, sqsQueueCoordsFromName, sqsSendMessage, sqsSendMessageBatch
+    feeds as coreFeeds,
+    support as coreSupport,
 } from 'symphony-datafeed-core';
+
+const {
+    broadcast,
+    fanout,
+    pushBackMessage: corePushBackMessage,
+    reingestMessages,
+} = coreFeeds.producers;
 
 export default class BusService {
 
+    /**
+     * Constructor
+     *
+     * @param {{
+     *  sqsClient: AWS.SQS,
+     *  snsClient: AWS.SNS,
+     *  options: {
+     *      aws: {region: string, accountId: number},
+     *      fanout: {
+     *          feedQueuePrefix: string,
+     *          messaging: {
+     *              broadcast: {topicNamePrefix: string}
+     *          },
+     *          ingestionQueue: {name: string}
+     *      },
+     *      supportServices: {queueName: string}
+     *  }
+     * }} param
+     */
     constructor({ sqsClient, snsClient, options }) {
         this.sqsClient = sqsClient;
         this.snsClient = snsClient;
+        const {
+            aws,
+            fanout: {
+                feedQueuePrefix,
+                messaging: {
+                    broadcast: {
+                        topicNamePrefix,
+                    },
+                    ingestionQueue,
+                },
+            },
+            sqs,
+            supportServices,
+        } = options;
 
-        this.aws = _.get(options, 'aws');
-        this.feedQueuePrefix = _.get(options, 'fanout.feedQueuePrefix');
-        this.topicNamePrefix = _.get(options, 'fanout.messaging.broadcast.topicNamePrefix');
-        this.subscriptionQueueName = _.get(options, 'fanout.messaging.broadcastSubscriptionQueue.name');
-        this.ingestionQueueName = _.get(options, 'fanout.messaging.ingestionQueue.name');
-        this.useQueueUrlBuilderFromAWS = _.get(options, 'sqs.endpoint');
-        this.telemetryIngestionQueueName = _.get(options, 'telemetry.telemetryIngestionQueueName');
-
+        this.aws = aws;
+        this.fanoutOptions = { feedQueuePrefix, aws };
+        this.broadcastOptions = { aws, broadcast: { topicNamePrefix } };
+        this.ingestionQueueName = ingestionQueue.name;
+        this.localstackSqsEndpoint = sqs?.endpoint;
+        this.supportServicesQueueName = supportServices.queueName;
     }
 
-    getIngestionQueueContext() {
-        if (!this.ingestionQueueContext) {
-            this.ingestionQueueContext = sqsQueueCoordsFromName(
-                this.ingestionQueueName,
-                {
-                    aws: this.aws,
-                    endpoint: this.useQueueUrlBuilderFromAWS
-                }
-            );
-        }
-        return this.ingestionQueueContext;
+    sendTelemetry(telemetryMessage) {
+        return coreSupport.sendSupportMessage({
+            sqsClient: this.sqsClient,
+            queueName: this.supportServicesQueueName,
+            message: telemetryMessage,
+            options: { aws: this.aws },
+        });
     }
 
-    getTelemetryIngestionQueueContext() {
-        if (!this.telemetryIngestionQueueContext) {
-            this.telemetryIngestionQueueContext = sqsQueueCoordsFromName(
-                this.telemetryIngestionQueueName,
-                {
-                    aws: this.aws,
-                    endpoint: this.useQueueUrlBuilderFromAWS
-                }
-            );
-        }
-        return this.telemetryIngestionQueueContext;
-    }
-
-    sendTelemetry(telemetry) {
-        const queueContext = this.getTelemetryIngestionQueueContext();
-        return sqsSendMessage(this.sqsClient, queueContext, telemetry);
-    }
-
-    async pushBackMessage(message) {
-        const queueContext = this.getIngestionQueueContext();
-
-        /**
+    pushBackMessage(message) {
+        /*
          * We could use here two functions to put the message back to the queue.
          * - sqsSendMessage
          * - sqsNackMessage (changeMessageVisibility)
@@ -72,56 +86,56 @@ export default class BusService {
          * SQS. In terms of performance there is no difference as well, neither in terms of
          * latency.
          */
-
-        return sqsSendMessage(this.sqsClient, queueContext, message);
+        return corePushBackMessage({
+            sqsClient: this.sqsClient,
+            queueName: this.ingestionQueueName,
+            message,
+            options: { aws: this.aws },
+        });
     }
 
-    async handleSplit(splits, messageSize) {
-        const queueContext = this.getIngestionQueueContext();
-        /**
+    handleSplit(splits, messageSize) {
+        /*
          * the size of the batch is already considering the provided message size, e.g.:
          *  - splits array contains 7 messages
          *  - message size is 100k
          *  - number of messages in the batches will be: 2, 2, 2, 1
          */
-        return sqsSendMessageBatch(this.sqsClient, queueContext, splits, messageSize);
+        return reingestMessages({
+            sqsClient: this.sqsClient,
+            queueName: this.ingestionQueueName,
+            messages: splits,
+            sizeOfEveryMessage: messageSize,
+            options: { aws: this.aws },
+        });
     }
 
     fanoutMessage(message, feeds, podId) {
-        return fanout(
-            this.sqsClient,
+        return fanout({
+            sqsClient: this.sqsClient,
             feeds,
             message,
             podId,
-            {
-                aws: this.aws,
-                feedQueuePrefix: this.feedQueuePrefix,
-                broadcast: {
-                    topicNamePrefix: this.topicNamePrefix,
-                    subscriptionQueueName: this.subscriptionQueueName
-                },
-                endpoint: this.useQueueUrlBuilderFromAWS
-            }
-        );
+            options: this.fanoutOptions,
+        });
     }
 
     broadcastMessage(message, podId) {
-        return broadcast(
-            this.snsClient,
+        return broadcast({
+            snsClient: this.snsClient,
             podId,
             message,
-            {
-                aws: this.aws,
-                broadcast: {
-                    topicNamePrefix: this.topicNamePrefix
-                }
-            }
-        );
+            options: this.broadcastOptions,
+        });
     }
 
     sendRecycleFeed(feed) {
-        const queueContext = this.getTelemetryIngestionQueueContext();
-        return sqsSendMessage(this.sqsClient, queueContext, feed);
+        return coreSupport.sendSupportMessage({
+            sqsClient: this.sqsClient,
+            queueName: this.supportServicesQueueName,
+            message: feed,
+            options: { aws: this.aws },
+        });
     }
 
 }

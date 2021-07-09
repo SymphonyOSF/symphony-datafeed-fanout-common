@@ -4,12 +4,13 @@
       "@babel/preset-env",
       {
         "targets": {
-          "node": "current"
+          "node": "12"
         }
       }
     ]
   ],
   "plugins": [
-    "babel-plugin-rewire"
+    "istanbul",
+    "rewire"
   ]
 }

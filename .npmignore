@@ -1,1 +1,11 @@
+.babelrc
+.eslint*
+.mocharc.json
+.nycrc
 .nyc_output
+.vscode
+.idea
+coverage
+scratches
+spec
+src

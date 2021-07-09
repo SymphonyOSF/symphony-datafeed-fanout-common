@@ -1,60 +1,61 @@
 {
-  "engines": {
-    "node": ">=8.0.0",
-    "npm": ">=6.0.0"
-  },
-  "name": "fanout-common",
-  "description": "Common code between the ecs-fanout and the lambda-fanout",
-  "version": "2.0.1",
-  "author": "Symphony",
-  "license": "UNLICENSED",
-  "main": "dist/index.js",
-  "keywords": [],
-  "homepage": "https://github.com/SymphonyOSF/symphony-datafeed-fanout-common",
-  "scripts": {
-    "build": "babel src -d dist --source-maps 'inline'",
-    "rebuild": "npm run clean && npm run build",
-    "clean": "rm -rf dist",
-    "prepare": "npm run rebuild",
-    "lint": "eslint --ext .js src",
-    "test": "nyc mocha --require @babel/register --recursive spec/unit/*.spec.js --reporter spec",
-    "security-check": "npm audit --registry=https://registry.npmjs.org --production"
-  },
-  "husky": {
-    "hooks": {
-      "pre-commit": "npm run lint && npm run test && npm run security-check"
+    "engines": {
+        "node": ">=12",
+        "npm": ">=6"
+    },
+    "name": "fanout-common",
+    "description": "Common code between the ecs-fanout and the lambda-fanout",
+    "version": "3.0.5",
+    "author": "Symphony",
+    "license": "UNLICENSED",
+    "main": "dist/index.js",
+    "keywords": [],
+    "homepage": "https://github.com/SymphonyOSF/symphony-datafeed-fanout-common",
+    "scripts": {
+        "build": "babel src -d dist --source-maps 'inline'",
+        "rebuild": "npm run clean && npm run build",
+        "clean": "rm -rf dist",
+        "prepare": "npm run rebuild",
+        "lint": "eslint --ext .js src",
+        "test": "nyc mocha --recursive spec/unit",
+        "security-check": "npm audit --registry=https://registry.npmjs.org --production"
+    },
+    "husky": {
+        "hooks": {
+            "pre-commit": "npm run lint && npm run test && npm run security-check"
+        }
+    },
+    "dependencies": {
+        "lodash": "4.17.21",
+        "symphony-datafeed-core": "5.0.5"
+    },
+    "devDependencies": {
+        "@babel/cli": "7.14.5",
+        "@babel/core": "7.14.6",
+        "@babel/eslint-parser": "7.14.7",
+        "@babel/node": "7.14.7",
+        "@babel/preset-env": "7.14.7",
+        "@babel/register": "7.14.5",
+        "@istanbuljs/nyc-config-babel": "3.0.0",
+        "babel-plugin-istanbul": "6.0.0",
+        "babel-plugin-rewire": "1.2.0",
+        "chai": "4.3.4",
+        "chai-as-promised": "7.1.1",
+        "eslint": "7.30.0",
+        "eslint-config-airbnb-base": "14.2.1",
+        "husky": "5.0.9",
+        "mocha": "9.0.2",
+        "nyc": "15.1.0",
+        "sinon": "11.1.1",
+        "sinon-chai": "3.7.0"
+    },
+    "nyc": {
+        "all": false,
+        "include": [
+            "src/**/*.js"
+        ],
+        "exclude": [
+            "**/*.spec.js"
+        ]
     }
-  },
-  "dependencies": {
-    "lodash": "4.17.21",
-    "symphony-datafeed-core": "4.0.3"
-  },
-  "devDependencies": {
-    "@babel/cli": "7.13.16",
-    "@babel/core": "7.13.16",
-    "@babel/node": "7.13.13",
-    "@babel/preset-env": "7.13.15",
-    "@babel/register": "7.13.16",
-    "babel-eslint": "10.1.0",
-    "babel-plugin-rewire": "1.2.0",
-    "chai": "4.3.4",
-    "chai-as-promised": "7.1.1",
-    "eslint": "7.25.0",
-    "eslint-config-airbnb-base": "14.2.1",
-    "husky": "5.0.9",
-    "mocha": "8.3.2",
-    "mochawesome": "6.2.2",
-    "nyc": "15.1.0",
-    "sinon": "10.0.0",
-    "sinon-chai": "3.6.0"
-  },
-  "nyc": {
-    "all": false,
-    "include": [
-      "src/**/*.js"
-    ],
-    "exclude": [
-      "**/*.spec.js"
-    ]
-  }
 }

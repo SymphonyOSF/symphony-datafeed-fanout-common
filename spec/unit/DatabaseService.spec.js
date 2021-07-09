@@ -15,15 +15,23 @@ describe('DatabaseService Tests', () => {
 
     describe('Fetch feeds', () => {
         it('Should fetch feeds with success', async () => {
-            DatabaseService.__Rewire__('findFeeds', sinon.fake.resolves(true));
+            const fake = sinon.fake.resolves(true);
+            DatabaseService.__Rewire__('findFeedsByMessage', fake);
             const databaseService = new DatabaseService({
                 daxClient: null, directClient: null, tableName: 'table', staleFeedsTtl: {}
             });
-            const result = await databaseService.fetchFeeds({}, []);
+            const result = await databaseService.fetchFeeds({});
+            expect(fake).to.be.calledOnceWith({
+                daxClient: null,
+                directClient: null,
+                tableName: 'table',
+                staleFeedsTtl: {},
+                message: {},
+            });
             expect(result).to.be.true;
         });
         it('Should not fetch feeds', async () => {
-            DatabaseService.__Rewire__('findFeeds', sinon.fake.rejects(new Error('42')));
+            DatabaseService.__Rewire__('findFeedsByMessage', sinon.fake.rejects(new Error('42')));
             const databaseService = new DatabaseService({
                 daxClient: null, directClient: null, tableName: 'table', staleFeedsTtl: {}
             });

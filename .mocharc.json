@@ -1,0 +1,6 @@
+{
+  "require": [
+    "@babel/register",
+    "spec/unit/fixtures/mocha.js"
+  ]
+}

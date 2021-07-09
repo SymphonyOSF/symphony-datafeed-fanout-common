@@ -3,4 +3,5 @@ node_modules
 .nyc_output
 .idea
 .vscode
-scratch*.js
+scratches
+coverage

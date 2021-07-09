@@ -15,13 +15,19 @@ describe('ObjectStorageService Tests', () => {
 
     describe('Get payload from s3 feeds', () => {
         it('Should get payload with success', async () => {
-            ObjectStorageService.__Rewire__('s3GetObject', sinon.fake.resolves(true));
+            const fake = sinon.fake.resolves(true);
+            ObjectStorageService.__Rewire__('getIngestedMessageFromStorage', fake);
             const objectStorageService = new ObjectStorageService(null);
             const result = await objectStorageService.getPayload({});
+            expect(fake).to.be.calledOnceWith({
+                s3Client: null,
+                bucket: undefined,
+                key: undefined,
+            });
             expect(result).to.be.true;
         });
         it('Should not get payload from s3', async () => {
-            ObjectStorageService.__Rewire__('s3GetObject', sinon.fake.rejects(new Error('42')));
+            ObjectStorageService.__Rewire__('getIngestedMessageFromStorage', sinon.fake.rejects(new Error('42')));
             const objectStorageService = new ObjectStorageService(null);
             let result;
             try {

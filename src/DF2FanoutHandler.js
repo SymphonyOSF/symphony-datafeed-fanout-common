@@ -1,5 +1,8 @@
 import _ from 'lodash';
-import { DF2Constants, generateVLMCacheKeyPrefix, generateCacheKeysToReplicate } from 'symphony-datafeed-core';
+import {
+    DF2Constants,
+    utils as coreUtils,
+} from 'symphony-datafeed-core';
 
 import validatePayloadType from './checkers/PayloadValidator';
 import PipelineError from './exceptions/PipelineError';
@@ -7,6 +10,7 @@ import Telemetry from './telemetry/Telemetry';
 import Metrics from './telemetry/Metrics';
 import MetricsConstants from './telemetry/MetricsConstants';
 
+const { getVLMCacheKeyPrefix, getReplicationCacheKeys } = coreUtils.cacheKeys;
 export default class DF2FanoutHandler {
 
     constructor({
@@ -51,7 +55,7 @@ export default class DF2FanoutHandler {
 
             this.logger.debug('id[%s] - STEP::Message parsing. Received message = %o', message.id, message);
 
-            /**
+            /*
              * If the message has the field originalMessageId, it means that this message was
              * already processed by the function, and was re-inserted in the queue because it was
              * split in the previous processing, let's check and assign the original id to the
@@ -64,7 +68,7 @@ export default class DF2FanoutHandler {
             }
 
             if (message.data.isSplit || (message.data.retries && message.data.retries > 0)) {
-                /**
+                /*
                  * If a message is split, it means df2 fanout already processed this message and
                  * re-inserted the message in the ingestion queue, so the message is ready to go
                  * to the rest of the main flow, i.e., it was already processed in all validation/
@@ -165,7 +169,7 @@ export default class DF2FanoutHandler {
 
         this.logger.debug('id[%s] - STEP::VLM validation: message size[%d] | full DL size[%d] | max DL size of split msg [%d] -> final msg size [%d]', message.id, messageSize, fullDistributionListSize, maxDLSizeOfSplitMsg, finalMessageSize);
 
-        /**
+        /*
          * Let's calculate the message size minus DL size because the DL will not be used in the
          * publish to SQS. If the message if fanouted to a feed, it goes without the DL, obviously,
          * and if the message is re-inserted in the queue, it goes with a small DL with max size is
@@ -173,7 +177,7 @@ export default class DF2FanoutHandler {
          */
 
         if (finalMessageSize > this.cutoffLimitPubToSqs) {
-            /**
+            /*
              * remove the internal payload and let it be retrieved in the
              * future by the feeder, because we are going to fanout to N-SQS
              * feed queues, we cannot write a message > 256kb as well in the
@@ -191,8 +195,8 @@ export default class DF2FanoutHandler {
 
                     result.isActivated = true;
 
-                    const keyPrefix = generateVLMCacheKeyPrefix(message.data);
-                    const keys = generateCacheKeysToReplicate(keyPrefix);
+                    const keyPrefix = getVLMCacheKeyPrefix(message.data);
+                    const keys = getReplicationCacheKeys(keyPrefix);
                     const promises = [];
                     this.logger.debug('Received a VLM and storing its payload at key [%s]', keyPrefix);
                     const internalPayload = _.get(message, 'data.payload.payload');
@@ -229,7 +233,7 @@ export default class DF2FanoutHandler {
                 this.logger.warn('id[%s] Cannot cache VLM: Redis error: %o', message.id, redisError);
             }
 
-            /**
+            /*
              *  Removing the internal payload
              */
             message.data.payload.payload = null;
@@ -238,18 +242,6 @@ export default class DF2FanoutHandler {
         }
 
         return result;
-    }
-
-    adaptDistributionList(id, podId, distributionList) {
-        this.logger.debug('id[%s] - STEP::adaptDistributionList', id);
-
-        for (let i = 0; i < distributionList.length; i++) {
-            distributionList[ i ] = `${DF2Constants.DynamoDB.FEED_PK_USER_PREFIX}${distributionList[ i ]}`;
-        }
-
-        // pod id is added at the end of the list in order to fetch datahose feeds
-
-        distributionList.push(`${DF2Constants.DynamoDB.FEED_PK_POD_PREFIX}${podId}`);
     }
 
     isMessageSplittable(distributionList) {
@@ -385,12 +377,10 @@ export default class DF2FanoutHandler {
     }
 
     async processRecord(record, telemetry, isProcessedByEcs = false) {
-        /**
-         * metrics will contain all measures computed for the current record under processing
-         */
+        // metrics will contain all measures computed for the current record under processing
         const metrics = new Metrics();
 
-        /**
+        /*
          * we are not able to calculate the IAT only for the very first message received since
          * the lambda function has started
          */
@@ -408,12 +398,12 @@ export default class DF2FanoutHandler {
             metrics.setMessageId(message.id);
 
             if (!isReInsertedMessage) {
-                /**
+                /*
                  * receiving this message for the very first time
                  */
                 metrics.setMetricsGeneratedBy(MetricsConstants.METRICS_GENERATED_BY_SBE);
             } else {
-                /**
+                /*
                  * it is a message already processed by the df2-fanout and re-added in the queue
                  */
                 metrics.setMetricsGeneratedBy(MetricsConstants.METRICS_GENERATED_BY_DF2_FANOUT);
@@ -467,8 +457,6 @@ export default class DF2FanoutHandler {
                         metrics.setDistributionListSize(distributionList.length);
 
                         if (!isReInsertedMessage) {
-                            this.adaptDistributionList(message.id, podId, distributionList);
-
                             const splitD0 = Date.now();
                             mustSplitMsg = await this.mustSplitMessage(message, podId, distributionList);
                             metrics.calculateInternalLatencyForSplit(Date.now() - splitD0);
@@ -480,21 +468,21 @@ export default class DF2FanoutHandler {
                             const d1Fetch = Date.now();
                             this.logger.debug('id[%s] - STEP::findFeeds', message.id);
                             const {
-                                feeds,
-                                feedsItemsToBeDeleted,
-                                feedsToBeStale,
-                                feedsToBeReuse
-                            } = await this.databaseService.fetchFeeds(message.data, distributionList);
+                                active,
+                                toDelete,
+                                toStale,
+                                toReuse
+                            } = await this.databaseService.fetchFeeds(message);
                             const d2Fetch = Date.now();
                             metrics.calculateInternalLatencyForFetchFeeds(d2Fetch - d1Fetch);
-                            const numberOfFetchedFeeds = feeds.length;
+                            const numberOfFetchedFeeds = active.length;
                             metrics.setNumberOfFetchedFeeds(numberOfFetchedFeeds);
 
-                            this.logger.debug('id[%s] - STEP::findFeeds - DONE - fetched feeds[%d] - latency[%d]ms: %o', message.id, numberOfFetchedFeeds, d2Fetch - d1Fetch, feeds);
+                            this.logger.debug('id[%s] - STEP::findFeeds - DONE - fetched feeds[%d] - latency[%d]ms: %o', message.id, numberOfFetchedFeeds, d2Fetch - d1Fetch, active);
 
                             const d1Fanout = Date.now();
                             this.logger.debug('id[%s] - STEP::fanout INIT', message.id);
-                            const fanoutResults = await this.busService.fanoutMessage(message.data, feeds, podId);
+                            const fanoutResults = await this.busService.fanoutMessage(message.data, active, podId);
                             fanoutResults.forEach(fanoutResult => {
                                 const isRejected = fanoutResult.status === 'rejected';
                                 if (isRejected) {
@@ -515,12 +503,12 @@ export default class DF2FanoutHandler {
                             metrics.calculateInternalLatencyForFanout(d2Fanout - d1Fanout);
                             this.logger.debug('id[%s] - STEP::fanout - DONE - latency[%d]ms', message.id, d2Fanout - d1Fanout);
 
-                            const hasFeedsToRecycle = !_.isEmpty(feedsItemsToBeDeleted) || !_.isEmpty(feedsToBeStale) || !_.isEmpty(feedsToBeReuse);
+                            const hasFeedsToRecycle = !_.isEmpty(toDelete) || !_.isEmpty(toStale) || !_.isEmpty(toReuse);
                             if (hasFeedsToRecycle) {
                                 const df1Recycling = Date.now();
                                 this.logger.debug('id[%s] - STEP:: recycling feeds INIT', message.id);
-                                this.logger.debug('id[%s] - STEP:: recycling feeds - feedsToRemove [ %o ], feedsToStale [ %o ], feedsToReuse [ %o ]', message.id, feedsItemsToBeDeleted, feedsToBeStale, feedsToBeReuse);
-                                await this.feedService.recyclingFeeds(feedsToBeStale, feedsToBeReuse, feedsItemsToBeDeleted, podId);
+                                this.logger.debug('id[%s] - STEP:: recycling feeds - feedsToRemove [ %o ], feedsToStale [ %o ], feedsToReuse [ %o ]', message.id, toDelete, toStale, toReuse);
+                                await this.feedService.recyclingFeeds(toStale, toReuse, toDelete, podId);
                                 const df2Recycling = Date.now();
                                 metrics.calculateInternalLatencyForFeedsRecycling(df2Recycling - df1Recycling);
                                 this.logger.debug('id[%s] - STEP::recycling feeds - DONE - latency[%d]ms', message.id, df2Recycling - df1Recycling);
@@ -569,9 +557,7 @@ export default class DF2FanoutHandler {
     }
 
     async closeTelemetry(telemetry) {
-        /**
-         * adding the total elapsed time to the telemetry headers metrics
-         */
+        // adding the total elapsed time to the telemetry headers metrics
         telemetry.computeTelemetryTotalElapsedTime();
         this.logger.debug('Telemetry: %o', telemetry);
         if (this.isMetricsExportationActivated) {
@@ -588,9 +574,7 @@ export default class DF2FanoutHandler {
         const batchSize = records.length;
         const promises = [];
 
-        /**
-         * adding the batchSize to the telemetry headers metrics
-         */
+        // adding the batchSize to the telemetry headers metrics
         telemetry.setBatchSize(batchSize);
 
         this.logger.debug('Received batch size: %d', batchSize);
