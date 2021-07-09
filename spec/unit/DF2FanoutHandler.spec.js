@@ -652,6 +652,7 @@ describe('DF2FanoutHandler Tests', () => {
             const fanoutService = new DF2FanoutHandler({
                 logger, busService, databaseService, feedService
             });
+            sinon.stub(fanoutService, 'shouldLogDelayedMessagesAsWarn').returns(true);
             const records = [ recordForReinsertedMessage ];
             const result = await fanoutService.consume(records);
             expect(result[ 0 ].messageId).to.eq(internalData.originalMessageId);
@@ -869,6 +870,7 @@ describe('DF2FanoutHandler Tests', () => {
                 const fanoutService = new DF2FanoutHandler({
                     logger, busService, databaseService, feedService, objectStorageService
                 });
+                sinon.stub(fanoutService, 'shouldLogDelayedMessagesAsWarn').returns(true);
                 const records = [ record ];
                 const result = await fanoutService.consume(records);
                 expect(result[ 0 ].messageId).to.eq(record.messageId);
@@ -926,6 +928,7 @@ describe('DF2FanoutHandler Tests', () => {
                 const fanoutService = new DF2FanoutHandler({
                     logger, busService, databaseService, feedService, objectStorageService
                 });
+                sinon.stub(fanoutService, 'shouldLogDelayedMessagesAsWarn').returns(true);
                 const records = [ record ];
                 const result = await fanoutService.consume(records);
                 expect(result[ 0 ].messageId).to.eq(record.messageId);
@@ -948,6 +951,7 @@ describe('DF2FanoutHandler Tests', () => {
                 const fanoutService = new DF2FanoutHandler({
                     logger, busService, databaseService, feedService, objectStorageService
                 });
+                sinon.stub(fanoutService, 'shouldLogDelayedMessagesAsWarn').returns(true);
                 const records = [ record ];
                 const result = await fanoutService.consume(records);
                 expect(result[ 0 ].messageId).to.eq(record.messageId);
@@ -1012,6 +1016,7 @@ describe('DF2FanoutHandler Tests', () => {
                 const fanoutService = new DF2FanoutHandler({
                     logger, busService, databaseService, feedService, objectStorageService, cacheRepoService
                 });
+                sinon.stub(fanoutService, 'shouldLogDelayedMessagesAsWarn').returns(true);
                 const records = [ record ];
                 const result = await fanoutService.consume(records);
                 expect(result[ 0 ].messageId).to.eq(record.messageId);
@@ -1036,6 +1041,7 @@ describe('DF2FanoutHandler Tests', () => {
                 const fanoutService = new DF2FanoutHandler({
                     logger, busService, databaseService, feedService, objectStorageService, cacheRepoService
                 });
+                sinon.stub(fanoutService, 'shouldLogDelayedMessagesAsWarn').returns(true);
                 const records = [ record ];
                 const result = await fanoutService.consume(records);
                 expect(result[ 0 ].messageId).to.eq(record.messageId);
@@ -1057,6 +1063,7 @@ describe('DF2FanoutHandler Tests', () => {
                 const fanoutService = new DF2FanoutHandler({
                     logger, busService, databaseService, feedService, objectStorageService
                 });
+                sinon.stub(fanoutService, 'shouldLogDelayedMessagesAsWarn').returns(true);
                 const records = [ record ];
                 const result = await fanoutService.consume(records);
                 expect(result[ 0 ].messageId).to.eq(record.messageId);
@@ -1079,6 +1086,7 @@ describe('DF2FanoutHandler Tests', () => {
                 const fanoutService = new DF2FanoutHandler({
                     logger, busService, databaseService, feedService, objectStorageService
                 });
+                sinon.stub(fanoutService, 'shouldLogDelayedMessagesAsWarn').returns(true);
                 const records = [ record ];
                 const result = await fanoutService.consume(records);
                 expect(result[ 0 ].messageId).to.eq(record.messageId);
@@ -1248,6 +1256,88 @@ describe('DF2FanoutHandler Tests', () => {
             expect(result[ 0 ].messageId).to.eq(record.messageId);
             expect(result[ 0 ].isProcessed).to.be.true;
             expect(feedService.recyclingFeeds).to.have.not.been.calledOnce;
+        });
+    });
+
+    describe('Audit logging', () => {
+        const loggerOptions = {
+            delayedMessageThresholdsMs: {
+                sbeToS2FwdElapsedTime: 100,
+                s2FwdToSentToSqsElapsedTime: 100,
+                sentToSqsToRcvByDf2FanoutElapsedTime: 100,
+                df2FanoutInternalProcessingTime: 100,
+            },
+        };
+
+        const hops = Object.freeze({
+            sbeToS2FwdElapsedTime: 100,
+            s2FwdToSentToSqsElapsedTime: 100,
+            sentToSqsToRcvByDf2FanoutElapsedTime: 100,
+            df2FanoutInternalProcessingTime: 100,
+        });
+
+        const fanoutServiceParams = { logger, options: { logger: loggerOptions } };
+
+        const getDelayedHops = (propertyName) => {
+            const delayedHops = { ...hops };
+            delayedHops[ propertyName ] = 100
+              + loggerOptions.delayedMessageThresholdsMs[ propertyName ];
+
+            return delayedHops;
+        };
+
+        const testAllPossibleDelays = (fanoutService, payloadType) => {
+
+            let delayedHops = getDelayedHops('sbeToS2FwdElapsedTime');
+            let shouldLog = fanoutService.shouldLogDelayedMessagesAsWarn(payloadType, delayedHops);
+            expect(shouldLog).to.be.true;
+
+            delayedHops = getDelayedHops('s2FwdToSentToSqsElapsedTime');
+            shouldLog = fanoutService.shouldLogDelayedMessagesAsWarn(payloadType, delayedHops);
+            expect(shouldLog).to.be.true;
+
+            delayedHops = getDelayedHops('sentToSqsToRcvByDf2FanoutElapsedTime');
+            shouldLog = fanoutService.shouldLogDelayedMessagesAsWarn(payloadType, delayedHops);
+            expect(shouldLog).to.be.true;
+
+            delayedHops = getDelayedHops('df2FanoutInternalProcessingTime');
+            shouldLog = fanoutService.shouldLogDelayedMessagesAsWarn(payloadType, delayedHops);
+            expect(shouldLog).to.be.true;
+        };
+
+        it('should log as warn delayed Social or ObjectStatus messages', () => {
+            const fanoutService = new DF2FanoutHandler(fanoutServiceParams);
+
+            let payloadType = DF2Constants.EventType.SOCIAL_MESSAGE;
+            testAllPossibleDelays(fanoutService, payloadType);
+
+            payloadType = DF2Constants.EventType.OBJECT_STATUS;
+            testAllPossibleDelays(fanoutService, payloadType);
+        });
+
+        it('should NOT log as warn delayed messages of types other than Social/ObjectStatus', () => {
+            const payloadTypes = [
+                DF2Constants.EventType.REMOVE_BADGE_COUNT,
+                DF2Constants.EventType.PRESENCE_CHANGE,
+                DF2Constants.EventType.TYPING_NOTIFICATION,
+                DF2Constants.EventType.SIGNAL_NOTIFICATION
+            ];
+
+            const delayedHops = getDelayedHops('s2FwdToSentToSqsElapsedTime');
+            const fanoutService = new DF2FanoutHandler(fanoutServiceParams);
+
+            payloadTypes.forEach(payloadType => {
+                let shouldLog = fanoutService.shouldLogDelayedMessagesAsWarn(payloadType, delayedHops);
+                expect(shouldLog).to.be.false;
+            });
+        });
+
+        it('should NOT log as warn "on-time" messages of any type', () => {
+            const fanoutService = new DF2FanoutHandler(fanoutServiceParams);
+            Object.keys(DF2Constants.EventType).forEach(payloadType => {
+                const shouldLog = fanoutService.shouldLogDelayedMessagesAsWarn(payloadType, hops);
+                expect(shouldLog).to.be.false;
+            });
         });
     });
 });
